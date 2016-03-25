@@ -4,9 +4,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	_ "github.com/mattn/go-sqlite3"
 	nanomsg "github.com/op/go-nanomsg"
 	"infra/sysd/sysdCommonDefs"
-	"io/ioutil"
 	"log/syslog"
 )
 
@@ -35,16 +35,6 @@ func ConvertLevelStrToVal(str string) sysdCommonDefs.SRDebugLevel {
 	return val
 }
 
-type ComponentJson struct {
-	Module string `json:Module`
-	Level  string `json:Level`
-}
-
-type LoggingJson struct {
-	SystemLogging string          `json:SystemLogging`
-	Components    []ComponentJson `json:Components`
-}
-
 type Writer struct {
 	sysLogger       *syslog.Writer
 	GlobalLogging   bool
@@ -55,9 +45,9 @@ type Writer struct {
 	socketCh        chan []byte
 }
 
-func NewLogger(paramsDir string, name string, tag string, dbHdl *sql.DB) (*Writer, error) {
+func NewLogger(paramsDir string, name string, tag string) (*Writer, error) {
 	var err error
-	srLogger := &Writer{}
+	srLogger := new(Writer)
 	srLogger.MyComponentName = name
 	srLogger.sysLogger, err = syslog.New(syslog.LOG_INFO|syslog.LOG_DAEMON, tag)
 	if err != nil {
@@ -65,49 +55,28 @@ func NewLogger(paramsDir string, name string, tag string, dbHdl *sql.DB) (*Write
 		return srLogger, err
 	}
 
-	fileName := paramsDir
-	if fileName[len(fileName)-1] != '/' {
-		fileName = fileName + "/"
-	}
-	fileName = fileName + "logging.json"
-
-	srLogger.readLogLevelFromFile(fileName)
-	srLogger.readLogLevelFromDb(dbHdl)
+	srLogger.GlobalLogging = true
+	srLogger.MyLogLevel = sysdCommonDefs.INFO
+	// Read logging level from DB
+	srLogger.readLogLevelFromDb(paramsDir)
 	srLogger.initialized = true
 	fmt.Println("Logging level ", srLogger.MyLogLevel, " set for ", srLogger.MyComponentName)
 	return srLogger, err
 }
 
-func (logger *Writer) readLogLevelFromFile(fileName string) error {
-	var loggingConfig LoggingJson
-	var err error
-	data, err := ioutil.ReadFile(fileName)
+func (logger *Writer) readLogLevelFromDb(paramsDir string) error {
+	dbName := paramsDir + "UsrConfDb.db"
+	fmt.Println("Logger opening Config DB: ", dbName)
+	dbHdl, err := sql.Open("sqlite3", dbName)
 	if err != nil {
-		fmt.Println("Failed to read logging config file - ", fileName, " err - ", err)
+		fmt.Println("Failed to open connection to DB. ", err)
 		return err
 	}
-	err = json.Unmarshal(data, &loggingConfig)
-	if err != nil {
-		fmt.Println("Failed to unmarshal logging config: ", err)
-		return err
-	}
+	defer dbHdl.Close()
 
-	if loggingConfig.SystemLogging == "on" {
-		logger.GlobalLogging = true
-	}
-	for _, component := range loggingConfig.Components {
-		if component.Module == logger.MyComponentName {
-			logger.MyLogLevel = ConvertLevelStrToVal(component.Level)
-			break
-		}
-	}
-	return nil
-}
-
-func (logger *Writer) readLogLevelFromDb(dbHdl *sql.DB) error {
-	gRows, err := dbHdl.Query("SELECT * FROM SystemLoggingConfig")
+	gRows, err := dbHdl.Query("SELECT * FROM SystemLogging")
 	if err != nil {
-		fmt.Println("Unable to query DB - SystemLoggingConfig: ", err)
+		fmt.Println("Unable to query DB - SystemLogging: ", err)
 		return err
 	}
 	defer gRows.Close()
@@ -124,9 +93,9 @@ func (logger *Writer) readLogLevelFromDb(dbHdl *sql.DB) error {
 		}
 	}
 
-	cRows, err := dbHdl.Query("SELECT Module FROM ComponentLoggingConfig WHERE Module = ?", logger.MyComponentName)
+	cRows, err := dbHdl.Query("SELECT Module FROM ComponentLogging WHERE Module = ?", logger.MyComponentName)
 	if err != nil {
-		fmt.Println("Unable to query DB - ComponentLoggingConfig: ", err)
+		fmt.Println("Unable to query DB - ComponentLogging: ", err)
 		return err
 	}
 	defer cRows.Close()
@@ -199,6 +168,13 @@ func (logger *Writer) Notice(message string) error {
 }
 
 func (logger *Writer) Info(message string) error {
+	if logger.initialized && logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.INFO {
+		return logger.sysLogger.Info(message)
+	}
+	return nil
+}
+
+func (logger *Writer) Println(message string) error {
 	if logger.initialized && logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.INFO {
 		return logger.sysLogger.Info(message)
 	}

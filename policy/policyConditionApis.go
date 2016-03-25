@@ -46,8 +46,8 @@ func (db * PolicyEngineDB) CreatePolicyDstIpMatchPrefixSetCondition(inCfg Policy
 	var conditionInfo MatchPrefixConditionInfo
 	var conditionGetBulkInfo string
     if len(cfg.PrefixSet) == 0 && len(cfg.Prefix.IpPrefix) == 0 {
-		db.Logger.Println("Empty prefix set")
-		err = errors.New("Empty prefix set")
+		db.Logger.Println("Empty prefix set/nil prefix")
+		err = errors.New("Empty prefix set/nil prefix")
 		return val, err
 	}
     if len(cfg.PrefixSet) != 0 && len(cfg.Prefix.IpPrefix) != 0 {
@@ -73,6 +73,7 @@ func (db * PolicyEngineDB) CreatePolicyDstIpMatchPrefixSetCondition(inCfg Policy
        newPolicyCondition.ConditionGetBulkInfo = conditionGetBulkInfo 
 	   if ok := db.PolicyConditionsDB.Insert(patriciaDB.Prefix(inCfg.Name), newPolicyCondition); ok != true {
 	   db.Logger.Println(" return value not ok")
+	   err = errors.New("Error creating condition in the DB")
 	   return val, err
 	}
 	db.LocalPolicyConditionsDB.updateLocalDB(patriciaDB.Prefix(inCfg.Name),add)
@@ -89,12 +90,13 @@ func (db * PolicyEngineDB)CreatePolicyMatchProtocolCondition(cfg PolicyCondition
 
 	policyCondition := db.PolicyConditionsDB.Get(patriciaDB.Prefix(cfg.Name))
 	if(policyCondition == nil) {
-	   db.Logger.Println("Defining a new policy condition with name ", cfg.Name)
+	   db.Logger.Println("Defining a new policy condition with name ", cfg.Name, " to match on protocol ", cfg.MatchProtocolConditionInfo)
 	   matchProto := cfg.MatchProtocolConditionInfo
 	   newPolicyCondition := PolicyCondition{Name:cfg.Name,ConditionType:policyCommonDefs.PolicyConditionTypeProtocolMatch,ConditionInfo:matchProto ,LocalDBSliceIdx:(len(*db.LocalPolicyConditionsDB))}
        newPolicyCondition.ConditionGetBulkInfo = "match Protocol " + matchProto
 		if ok := db.PolicyConditionsDB.Insert(patriciaDB.Prefix(cfg.Name), newPolicyCondition); ok != true {
 			db.Logger.Println(" return value not ok")
+	        err = errors.New("Error creating condition in the DB")
 			return val, err
 		}
 	    db.LocalPolicyConditionsDB.updateLocalDB(patriciaDB.Prefix(cfg.Name),add)
@@ -109,10 +111,10 @@ func (db * PolicyEngineDB)CreatePolicyCondition(cfg PolicyConditionConfig) (err 
 	db.Logger.Println("CreatePolicyCondition")
 	switch cfg.ConditionType {
 		case "MatchDstIpPrefix":
-		   db.CreatePolicyDstIpMatchPrefixSetCondition(cfg)
+		   _, err = db.CreatePolicyDstIpMatchPrefixSetCondition(cfg)
 		   break
 		case "MatchProtocol":
-		   db.CreatePolicyMatchProtocolCondition(cfg)
+		    _, err = db.CreatePolicyMatchProtocolCondition(cfg)
 		   break
 		default:
 		   db.Logger.Println("Unknown condition type ", cfg.ConditionType)
