@@ -1,15 +1,16 @@
 package logging
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
-	_ "github.com/mattn/go-sqlite3"
+	"github.com/garyburd/redigo/redis"
 	nanomsg "github.com/op/go-nanomsg"
 	"infra/sysd/sysdCommonDefs"
 	"log"
 	"log/syslog"
+	"models"
 	"os"
+	"sysd"
 )
 
 func ConvertLevelStrToVal(str string) sysdCommonDefs.SRDebugLevel {
@@ -50,7 +51,7 @@ type Writer struct {
 	socketCh        chan []byte
 }
 
-func NewLogger(paramsDir string, name string, tag string) (*Writer, error) {
+func NewLogger(name string, tag string, listenToConfig bool) (*Writer, error) {
 	var err error
 	srLogger := new(Writer)
 	srLogger.MyComponentName = name
@@ -70,58 +71,63 @@ func NewLogger(paramsDir string, name string, tag string) (*Writer, error) {
 	srLogger.GlobalLogging = true
 	srLogger.MyLogLevel = sysdCommonDefs.INFO
 	// Read logging level from DB
-	srLogger.readLogLevelFromDb(paramsDir)
+	srLogger.readLogLevelFromDb()
 	srLogger.initialized = true
 	fmt.Println("Logging level ", srLogger.MyLogLevel, " set for ", srLogger.MyComponentName)
+	if listenToConfig {
+		go srLogger.ListenForLoggingNotifications()
+	}
 	return srLogger, err
 }
 
-func (logger *Writer) readLogLevelFromDb(paramsDir string) error {
-	dbName := paramsDir + "UsrConfDb.db"
-	fmt.Println("Logger opening Config DB: ", dbName)
-	dbHdl, err := sql.Open("sqlite3", dbName)
+func (logger *Writer) readSystemLoggingFromDb(dbHdl redis.Conn) error {
+	logger.Info("Reading SystemLogging")
+	var dbObj models.SystemLogging
+	objList, err := dbObj.GetAllObjFromDb(dbHdl)
 	if err != nil {
-		fmt.Println("Failed to open connection to DB. ", err)
+		logger.Err("DB query failed for SystemLogging config")
 		return err
 	}
-	defer dbHdl.Close()
+	obj := sysd.NewSystemLogging()
+	dbObject := objList[0].(models.SystemLogging)
+	models.ConvertsysdSystemLoggingObjToThrift(&dbObject, obj)
+	if obj.Logging == "on" {
+		logger.GlobalLogging = true
+	}
+	return nil
+}
 
-	gRows, err := dbHdl.Query("SELECT * FROM SystemLogging")
+func (logger *Writer) readComponentLoggingFromDb(dbHdl redis.Conn) error {
+	logger.Info("Reading ComponentLogging")
+	var dbObj models.ComponentLogging
+	objList, err := dbObj.GetAllObjFromDb(dbHdl)
 	if err != nil {
-		fmt.Println("Unable to query DB - SystemLogging: ", err)
+		logger.Err("DB query failed for ComponentLogging config")
 		return err
 	}
-	defer gRows.Close()
-	for gRows.Next() {
-		var global string
-		var logging string
-		err := gRows.Scan(&global, &logging)
-		if err != nil {
-			fmt.Println("Failed to read SystemLogging from DB - ", err)
-			return err
-		}
-		if logging == "on" {
-			logger.GlobalLogging = true
+	for idx := 0; idx < len(objList); idx++ {
+		obj := sysd.NewComponentLogging()
+		dbObject := objList[idx].(models.ComponentLogging)
+		models.ConvertsysdComponentLoggingObjToThrift(&dbObject, obj)
+		if obj.Module == logger.MyComponentName {
+			logger.MyLogLevel = ConvertLevelStrToVal(obj.Level)
+			return nil
 		}
 	}
+	return nil
+}
 
-	cRows, err := dbHdl.Query("SELECT Module FROM ComponentLogging WHERE Module = ?", logger.MyComponentName)
+func (logger *Writer) readLogLevelFromDb() error {
+	dbHdl, err := redis.Dial("tcp", "6379")
 	if err != nil {
-		fmt.Println("Unable to query DB - ComponentLogging: ", err)
+		logger.Err("Failed to dial out to Redis server")
 		return err
 	}
-	defer cRows.Close()
-	for cRows.Next() {
-		var module string
-		var level string
-		err := cRows.Scan(&module, &level)
-		if err != nil {
-			fmt.Println("Failed to read ComponentLogging from DB - ", err)
-			return err
-		}
-		logger.MyLogLevel = ConvertLevelStrToVal(level)
+	if dbHdl != nil {
+		logger.readSystemLoggingFromDb(dbHdl)
+		logger.readComponentLoggingFromDb(dbHdl)
+		dbHdl.Close()
 	}
-
 	return nil
 }
 
@@ -342,4 +348,6 @@ func (logger *Writer) ListenForLoggingNotifications() error {
 		}
 		logger.socketCh <- rxBuf
 	}
+	logger.Info(fmt.Sprintln("Existing logging config lister"))
+	return nil
 }
