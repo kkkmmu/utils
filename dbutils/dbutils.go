@@ -2,10 +2,15 @@ package dbutils
 
 import (
 	"fmt"
-	"models"
-	"utils/logging"
-
 	"github.com/garyburd/redigo/redis"
+	"models"
+	"time"
+	"utils/logging"
+)
+
+const (
+	DB_CONNECT_TIME_INTERVAL   = 2
+	DB_CONNECT_RETRY_LOG_COUNT = 100
 )
 
 type DBNotConnectedError struct {
@@ -18,7 +23,7 @@ func (e DBNotConnectedError) Error() string {
 }
 
 type DBUtil struct {
-	dbHdl   redis.Conn
+	redis.Conn
 	logger  *logging.Writer
 	network string
 	address string
@@ -33,38 +38,47 @@ func NewDBUtil(logger *logging.Writer) *DBUtil {
 }
 
 func (db *DBUtil) Connect() error {
-	dbHdl, err := redis.Dial(db.network, db.address)
-	if err != nil {
-		db.logger.Err("Failed to dial out to Redis server")
-	} else {
-		db.dbHdl = dbHdl
+	retryCount := 0
+	ticker := time.NewTicker(DB_CONNECT_TIME_INTERVAL * time.Second)
+	for _ = range ticker.C {
+		retryCount += 1
+		dbHdl, err := redis.Dial(db.network, db.address)
+		if err != nil {
+			if retryCount%DB_CONNECT_RETRY_LOG_COUNT == 0 {
+				if db.logger != nil {
+					db.logger.Err(fmt.Sprintln("Failed to dial out to Redis server. Retrying connection. Num retries = ", retryCount))
+				}
+			}
+		} else {
+			db.Conn = dbHdl
+			break
+		}
 	}
-
-	return err
+	return nil
 }
 
 func (db *DBUtil) Disconnect() {
-	if db.dbHdl != nil {
-		db.dbHdl.Close()
+	if db.Conn != nil {
+		db.Close()
 	}
 }
 
 func (db *DBUtil) StoreObjectInDb(obj models.ConfigObj) error {
-	return obj.StoreObjectInDb(db.dbHdl)
+	return obj.StoreObjectInDb(db.Conn)
 }
 
 func (db *DBUtil) DeleteObjectFromDb(obj models.ConfigObj) error {
-	if db.dbHdl == nil {
+	if db.Conn == nil {
 		return DBNotConnectedError{db.network, db.address}
 	}
-	return obj.DeleteObjectFromDb(db.dbHdl)
+	return obj.DeleteObjectFromDb(db.Conn)
 }
 
 func (db *DBUtil) GetObjectFromDb(obj models.ConfigObj, objKey string) (models.ConfigObj, error) {
-	if db.dbHdl == nil {
+	if db.Conn == nil {
 		return obj, DBNotConnectedError{db.network, db.address}
 	}
-	return obj.GetObjectFromDb(objKey, db.dbHdl)
+	return obj.GetObjectFromDb(objKey, db.Conn)
 }
 
 func (db *DBUtil) GetKey(obj models.ConfigObj) string {
@@ -72,25 +86,25 @@ func (db *DBUtil) GetKey(obj models.ConfigObj) string {
 }
 
 func (db *DBUtil) GetAllObjFromDb(obj models.ConfigObj) ([]models.ConfigObj, error) {
-	if db.dbHdl == nil {
+	if db.Conn == nil {
 		return make([]models.ConfigObj, 0), DBNotConnectedError{db.network, db.address}
 	}
-	return obj.GetAllObjFromDb(db.dbHdl)
+	return obj.GetAllObjFromDb(db.Conn)
 }
 
 func (db *DBUtil) CompareObjectsAndDiff(obj models.ConfigObj, updateKeys map[string]bool, inObj models.ConfigObj) (
 	[]bool, error) {
-	if db.dbHdl == nil {
+	if db.Conn == nil {
 		return make([]bool, 0), DBNotConnectedError{db.network, db.address}
 	}
 	return obj.CompareObjectsAndDiff(updateKeys, inObj)
 }
 
 func (db *DBUtil) UpdateObjectInDb(obj, inObj models.ConfigObj, attrSet []bool) error {
-	if db.dbHdl == nil {
+	if db.Conn == nil {
 		return DBNotConnectedError{db.network, db.address}
 	}
-	return obj.UpdateObjectInDb(inObj, attrSet, db.dbHdl)
+	return obj.UpdateObjectInDb(inObj, attrSet, db.Conn)
 }
 
 func (db *DBUtil) MergeDbAndConfigObj(obj, dbObj models.ConfigObj, attrSet []bool) (models.ConfigObj, error) {
@@ -99,8 +113,8 @@ func (db *DBUtil) MergeDbAndConfigObj(obj, dbObj models.ConfigObj, attrSet []boo
 
 func (db *DBUtil) GetBulkObjFromDb(obj models.ConfigObj, startIndex, count int64) (error, int64, int64, bool,
 	[]models.ConfigObj) {
-	if db.dbHdl == nil {
+	if db.Conn == nil {
 		return DBNotConnectedError{db.network, db.address}, 0, 0, false, make([]models.ConfigObj, 0)
 	}
-	return obj.GetBulkObjFromDb(startIndex, count, db.dbHdl)
+	return obj.GetBulkObjFromDb(startIndex, count, db.Conn)
 }
