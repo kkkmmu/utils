@@ -10,4 +10,5 @@ Contents:
 
 .. toctree::
    :maxdepth: 4
-   Utils <utils>
+
+   UTILS <utils>
