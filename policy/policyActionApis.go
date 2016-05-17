@@ -1,10 +1,33 @@
+//
+//Copyright [2016] [SnapRoute Inc]
+//
+//Licensed under the Apache License, Version 2.0 (the "License");
+//you may not use this file except in compliance with the License.
+//You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+//	 Unless required by applicable law or agreed to in writing, software
+//	 distributed under the License is distributed on an "AS IS" BASIS,
+//	 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//	 See the License for the specific language governing permissions and
+//	 limitations under the License.
+//
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
+//                                                                                                           
+
 // ribdPolicyActionApis.go
 package policy
 
 import (
 	"errors"
-	"strconv"
 	"fmt"
+	"strconv"
 	"utils/patriciaDB"
 	"utils/policy/policyCommonDefs"
 )
@@ -48,12 +71,12 @@ func (db *PolicyEngineDB) CreatePolicyRouteDispositionAction(cfg PolicyActionCon
 		db.Logger.Info(fmt.Sprintln("Defining a new policy action with name ", cfg.Name))
 		routeDispositionAction := ""
 		if cfg.Accept == true {
-			routeDispositionAction = "Accept"
+			routeDispositionAction = "permit"
 		} else if cfg.Reject == true {
-			routeDispositionAction = "Reject"
+			routeDispositionAction = "deny"
 		} else {
-			db.Logger.Err(fmt.Sprintln("User should set either one of accept/reject to true for this action type"))
-			err = errors.New("User should set either one of accept/reject to true for this action type")
+			db.Logger.Err(fmt.Sprintln("User should set either one of permit/deny to true for this action type"))
+			err = errors.New("User should set either one of permit/deny to true for this action type")
 			return false, err
 		}
 		newPolicyAction := PolicyAction{Name: cfg.Name, ActionType: policyCommonDefs.PolicyActionTypeRouteDisposition, ActionInfo: routeDispositionAction, LocalDBSliceIdx: (len(*db.LocalPolicyActionsDB))}
@@ -172,26 +195,26 @@ func (db *PolicyEngineDB) CreatePolicyAction(cfg PolicyActionConfig) (val bool, 
 	db.Logger.Info(fmt.Sprintln("CreatePolicyAction"))
 	switch cfg.ActionType {
 	case "RouteDisposition":
-		val,err = db.CreatePolicyRouteDispositionAction(cfg)
+		val, err = db.CreatePolicyRouteDispositionAction(cfg)
 		break
 	case "Redistribution":
-		val,err = db.CreatePolicyRedistributionAction(cfg)
+		val, err = db.CreatePolicyRedistributionAction(cfg)
 		break
 	case "SetAdminDistance":
-		val,err = db.CreatePolicyAdminDistanceAction(cfg)
+		val, err = db.CreatePolicyAdminDistanceAction(cfg)
 		break
 	case "NetworkStatementAdvertise":
-		val,err = db.CreatePolicyNetworkStatementAdvertiseAction(cfg)
+		val, err = db.CreatePolicyNetworkStatementAdvertiseAction(cfg)
 		break
 	case "Aggregate":
-		val,err = db.CreatePolicyAggregateAction(cfg)
+		val, err = db.CreatePolicyAggregateAction(cfg)
 		break
 	default:
 		db.Logger.Err(fmt.Sprintln("Unknown action type ", cfg.ActionType))
 		err = errors.New("Unknown action type")
-		return false,err
+		return false, err
 	}
-	return val,err
+	return val, err
 }
 
 func (db *PolicyEngineDB) DeletePolicyAction(cfg PolicyActionConfig) (val bool, err error) {
@@ -200,18 +223,18 @@ func (db *PolicyEngineDB) DeletePolicyAction(cfg PolicyActionConfig) (val bool, 
 	if actionItem == nil {
 		db.Logger.Err(fmt.Sprintln("action ", cfg.Name, "not found in the DB"))
 		err = errors.New("action not found")
-		return false,err
+		return false, err
 	}
 	action := actionItem.(PolicyAction)
 	if len(action.PolicyStmtList) != 0 {
 		db.Logger.Err(fmt.Sprintln("This action is currently being used by one or more policy statements. Try deleting the stmt before deleting the action"))
 		err = errors.New("This action is currently being used by one or more policy statements. Try deleting the stmt before deleting the action")
-		return false,err
+		return false, err
 	}
 	deleted := db.PolicyActionsDB.Delete(patriciaDB.Prefix(cfg.Name))
 	if deleted {
 		db.Logger.Info(fmt.Sprintln("Found and deleted actions ", cfg.Name))
 		db.LocalPolicyActionsDB.updateLocalDB(patriciaDB.Prefix(cfg.Name), del)
 	}
-	return true,err
+	return true, err
 }

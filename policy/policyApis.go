@@ -1,3 +1,26 @@
+//
+//Copyright [2016] [SnapRoute Inc]
+//
+//Licensed under the Apache License, Version 2.0 (the "License");
+//you may not use this file except in compliance with the License.
+//You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+//	 Unless required by applicable law or agreed to in writing, software
+//	 distributed under the License is distributed on an "AS IS" BASIS,
+//	 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//	 See the License for the specific language governing permissions and
+//	 limitations under the License.
+//
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
+//                                                                                                           
+
 // policyApis.go
 package policy
 
@@ -20,9 +43,9 @@ type PolicyStmt struct { //policy engine uses this
 	Actions         []string
 	PolicyList      []string
 	LocalDBSliceIdx int8
-	ImportStmt      bool
-	ExportStmt      bool
-	GlobalStmt      bool
+	//	ImportStmt      bool
+	//	ExportStmt      bool
+	//	GlobalStmt      bool
 }
 type PolicyStmtConfig struct {
 	Name            string
@@ -41,6 +64,7 @@ type Policy struct {
 	ImportPolicy            bool
 	ExportPolicy            bool
 	GlobalPolicy            bool
+	PolicyType              string
 	Extensions              interface{}
 }
 
@@ -56,6 +80,7 @@ type PolicyDefinitionConfig struct {
 	Export                     bool
 	Import                     bool
 	Global                     bool
+	PolicyType                 string
 	Extensions                 interface{}
 }
 
@@ -74,7 +99,7 @@ func validMatchConditions(matchConditionStr string) (valid bool) {
 	return valid
 }
 func (db *PolicyEngineDB) UpdateProtocolPolicyTable(protoType string, name string, op int) {
-	db.Logger.Info(fmt.Sprintln("updateProtocolPolicyTable for protocol ", protoType, " policy name ",name," op ", op))
+	db.Logger.Info(fmt.Sprintln("updateProtocolPolicyTable for protocol ", protoType, " policy name ", name, " op ", op))
 	var i int
 	policyList := db.ProtocolPolicyListDB[protoType]
 	if policyList == nil {
@@ -153,7 +178,7 @@ func (db *PolicyEngineDB) UpdatePrefixPolicyTableWithPrefix(ipAddr string, name 
 }
 func (db *PolicyEngineDB) UpdatePrefixPolicyTableWithMaskRange(ipAddr string, masklength string, name string, op int) {
 	db.Logger.Info(fmt.Sprintln("updatePrefixPolicyTableWithMaskRange"))
-	maskList := strings.Split(masklength, "..")
+	maskList := strings.Split(masklength, "-")
 	if len(maskList) != 2 {
 		db.Logger.Err(fmt.Sprintln("Invalid masklength range"))
 		return
@@ -325,6 +350,37 @@ func (db *PolicyEngineDB) UpdateActions(policyStmt PolicyStmt, action PolicyActi
 	db.PolicyActionsDB.Set(patriciaDB.Prefix(action.Name), action)
 	return err
 }
+func (db *PolicyEngineDB) ValidatePolicyStatementCreate(cfg PolicyStmtConfig) (err error) {
+	db.Logger.Println("ValidatePolicyStatementCreate")
+	policyStmt := db.PolicyStmtDB.Get(patriciaDB.Prefix(cfg.Name))
+	if policyStmt != nil {
+		db.Logger.Println("Duplicate Policy definition name")
+		err = errors.New("Duplicate policy definition")
+		return err
+	}
+	if !validMatchConditions(cfg.MatchConditions) {
+		db.Logger.Println("Invalid match conditions - try any/all")
+		err = errors.New("Invalid match conditions - try any/all")
+		return err
+	}
+	if len(cfg.Actions) > 1 {
+		db.Logger.Println("Cannot have more than 1 action in a policy")
+		err = errors.New("Cannot have more than 1 action in a policy")
+		return err
+	}
+	if cfg.Actions[0] != "permit" && cfg.Actions[0] != "deny" {
+		db.Logger.Err("Invalid stmt actions, can only be one of permit/deny")
+		return errors.New("Invalid stmt actions")
+	}
+	i := 0
+	for i = 0; i < len(cfg.Conditions); i++ {
+		if db.PolicyConditionsDB.Get(patriciaDB.Prefix(cfg.Conditions[i])) == nil {
+			db.Logger.Err(fmt.Sprintln("Condition ", cfg.Conditions[i], " not found "))
+			return errors.New("Condition not found")
+		}
+	}
+	return err
+}
 
 func (db *PolicyEngineDB) CreatePolicyStatement(cfg PolicyStmtConfig) (err error) {
 	db.Logger.Info(fmt.Sprintln("CreatePolicyStatement"))
@@ -334,11 +390,6 @@ func (db *PolicyEngineDB) CreatePolicyStatement(cfg PolicyStmtConfig) (err error
 		db.Logger.Info(fmt.Sprintln("Defining a new policy statement with name ", cfg.Name))
 		var newPolicyStmt PolicyStmt
 		newPolicyStmt.Name = cfg.Name
-		if !validMatchConditions(cfg.MatchConditions) {
-			db.Logger.Err(fmt.Sprintln("Invalid match conditions - try any/all"))
-			err = errors.New("Invalid match conditions - try any/all")
-			return err
-		}
 		newPolicyStmt.MatchConditions = cfg.MatchConditions
 		if len(cfg.Conditions) > 0 {
 			db.Logger.Info(fmt.Sprintln("Policy Statement has %d ", len(cfg.Conditions), " number of conditions"))
@@ -360,25 +411,8 @@ func (db *PolicyEngineDB) CreatePolicyStatement(cfg PolicyStmtConfig) (err error
 				err = errors.New("Cannot have more than 1 action in a policy")
 				return err
 			}
-			var action PolicyAction
 			newPolicyStmt.Actions = make([]string, 0)
-			for i = 0; i < len(cfg.Actions); i++ {
-				actionItem := db.PolicyActionsDB.Get(patriciaDB.Prefix(cfg.Actions[i]))
-				if actionItem != nil {
-					action = actionItem.(PolicyAction)
-				} else {
-					db.Logger.Err(fmt.Sprintln("action name ", cfg.Actions[i], " not defined"))
-					err = errors.New("action name not defined")
-				}
-				newPolicyStmt.ExportStmt, newPolicyStmt.ImportStmt, newPolicyStmt.GlobalStmt = db.PolicyActionType(action.ActionType)
-				newPolicyStmt.Actions = append(newPolicyStmt.Actions, cfg.Actions[i])
-				err = db.UpdateActions(newPolicyStmt, action, add)
-				if err != nil {
-					db.Logger.Info(fmt.Sprintln("updateActions returned err ", err))
-					err = errors.New("Update actions returned err")
-					return err
-				}
-			}
+			newPolicyStmt.Actions = append(newPolicyStmt.Actions, cfg.Actions[0])
 		}
 		newPolicyStmt.LocalDBSliceIdx = int8(len(*db.LocalPolicyStmtDB))
 		if ok := db.PolicyStmtDB.Insert(patriciaDB.Prefix(cfg.Name), newPolicyStmt); ok != true {
@@ -395,6 +429,24 @@ func (db *PolicyEngineDB) CreatePolicyStatement(cfg PolicyStmtConfig) (err error
 	return err
 }
 
+func (db *PolicyEngineDB) ValidatePolicyStatementDelete(cfg PolicyStmtConfig) (err error) {
+	db.Logger.Println("ValidatePolicyStatementCreate")
+	ok := db.PolicyStmtDB.Match(patriciaDB.Prefix(cfg.Name))
+	if !ok {
+		err = errors.New("No policy statement with this name found")
+		return err
+	}
+	policyStmtInfoGet := db.PolicyStmtDB.Get(patriciaDB.Prefix(cfg.Name))
+	if policyStmtInfoGet != nil {
+		policyStmtInfo := policyStmtInfoGet.(PolicyStmt)
+		if len(policyStmtInfo.PolicyList) != 0 {
+			db.Logger.Err(fmt.Sprintln("This policy stmt is being used by one or more policies. Delete the policies before deleting the stmt"))
+			err = errors.New("This policy stmt is being used by one or more policies. Delete the policies before deleting the stmt")
+			return err
+		}
+	}
+	return nil
+}
 func (db *PolicyEngineDB) DeletePolicyStatement(cfg PolicyStmtConfig) (err error) {
 	db.Logger.Info(fmt.Sprintln("DeletePolicyStatement for name ", cfg.Name))
 	ok := db.PolicyStmtDB.Match(patriciaDB.Prefix(cfg.Name))
@@ -446,7 +498,71 @@ func (db *PolicyEngineDB) DeletePolicyStatement(cfg PolicyStmtConfig) (err error
 	}
 	return err
 }
-
+func (db *PolicyEngineDB) UpdateApplyPolicy(info ApplyPolicyInfo, apply bool) {
+	db.Logger.Info("ApplyPolicy")
+	applyPolicy := info.ApplyPolicy
+	action := info.Action
+	conditions := make([]string, 0)
+	for i := 0; i < len(info.Conditions); i++ {
+		conditions = append(conditions, info.Conditions[i])
+	}
+	exportType, importType, _ := db.PolicyActionType(action.ActionType)
+	db.Logger.Info(fmt.Sprintln("exportType:", exportType, " importType:", importType))
+	if importType {
+		db.Logger.Info(fmt.Sprintln("Adding ", applyPolicy.Name, " as import policy"))
+		if db.ImportPolicyPrecedenceMap == nil {
+			db.ImportPolicyPrecedenceMap = make(map[int]string)
+		}
+		db.ImportPolicyPrecedenceMap[int(applyPolicy.Precedence)] = applyPolicy.Name
+	} else if exportType {
+		db.Logger.Info(fmt.Sprintln("Adding ", applyPolicy.Name, " as export policy"))
+		if db.ExportPolicyPrecedenceMap == nil {
+			db.ExportPolicyPrecedenceMap = make(map[int]string)
+		}
+		db.ExportPolicyPrecedenceMap[int(applyPolicy.Precedence)] = applyPolicy.Name
+	}
+	if db.ApplyPolicyMap[applyPolicy.Name] == nil {
+		db.ApplyPolicyMap[applyPolicy.Name] = make([]ApplyPolicyInfo, 0)
+	}
+	if HasActionInfo(db.ApplyPolicyMap[applyPolicy.Name], action) {
+		//for now do nothing, need to handle on update of conditions/stmt/policy
+	} else {
+		db.ApplyPolicyMap[applyPolicy.Name] = append(db.ApplyPolicyMap[applyPolicy.Name], ApplyPolicyInfo{applyPolicy, action, conditions})
+	}
+	if apply {
+	    db.PolicyEngineTraverseAndApplyPolicy(info)
+	}
+}
+func (db *PolicyEngineDB) ValidatePolicyDefinitionCreate(cfg PolicyDefinitionConfig) (err error) {
+	db.Logger.Println("ValidatePolicyDefinitionCreate")
+	policy := db.PolicyDB.Get(patriciaDB.Prefix(cfg.Name))
+	if policy != nil {
+		db.Logger.Println("Duplicate Policy definition name")
+		err = errors.New("Duplicate policy definition")
+		return err
+	}
+	var newPolicy Policy
+	newPolicy.Name = cfg.Name
+	newPolicy.Precedence = cfg.Precedence
+	newPolicy.MatchType = cfg.MatchType
+	for i := 0; i < len(cfg.PolicyDefinitionStatements); i++ {
+		Item := db.PolicyStmtDB.Get(patriciaDB.Prefix(cfg.PolicyDefinitionStatements[i].Statement))
+		if Item == nil {
+			db.Logger.Info(fmt.Sprintln("stmt name ", cfg.PolicyDefinitionStatements[i].Statement, " not defined"))
+			err = errors.New("stmt name not defined")
+			return err
+		}
+		stmt := Item.(PolicyStmt)
+		for cds := 0; cds < len(stmt.Actions);cds ++ {
+		    if !db.ConditionCheckForPolicyType(stmt.Conditions[cds],cfg.PolicyType) {
+			    db.Logger.Err(fmt.Sprintln("Trying to add statement with incompatible condition ", stmt.Conditions[cds]," to this policy of policyType: ", cfg.PolicyType))
+			    return errors.New("Incompatible condition type ")
+		    }
+		}
+		//TO_DO: similar validation for actions/sub-actions
+	}
+	return err
+}
 func (db *PolicyEngineDB) CreatePolicyDefinition(cfg PolicyDefinitionConfig) (err error) {
 	db.Logger.Info(fmt.Sprintln("CreatePolicyDefinition"))
 	policy := db.PolicyDB.Get(patriciaDB.Prefix(cfg.Name))
@@ -468,13 +584,7 @@ func (db *PolicyEngineDB) CreatePolicyDefinition(cfg PolicyDefinitionConfig) (er
 				stmt = Item.(PolicyStmt)
 			} else {
 				db.Logger.Err(fmt.Sprintln("Statement ", cfg.PolicyDefinitionStatements[i].Statement, " not defined"))
-				err = errors.New("action name not defined")
-			}
-			err = db.SetAndValidatePolicyType(&newPolicy, stmt)
-			if err != nil {
-				db.Logger.Err(fmt.Sprintln("Error in setting policy type"))
-				err = errors.New("Error setting policy type")
-				return err
+				err = errors.New("stmt name not defined")
 			}
 			err = db.UpdateGlobalStatementTable(newPolicy.Name, cfg.PolicyDefinitionStatements[i].Statement, add)
 			if err != nil {
@@ -489,9 +599,6 @@ func (db *PolicyEngineDB) CreatePolicyDefinition(cfg PolicyDefinitionConfig) (er
 				return err
 			}
 		}
-		for k := range newPolicy.PolicyStmtPrecedenceMap {
-			db.Logger.Info(fmt.Sprintln("key k = ", k))
-		}
 		newPolicy.LocalDBSliceIdx = int8(len(*db.LocalPolicyDB))
 		newPolicy.Extensions = cfg.Extensions
 		if ok := db.PolicyDB.Insert(patriciaDB.Prefix(cfg.Name), newPolicy); ok != true {
@@ -500,20 +607,6 @@ func (db *PolicyEngineDB) CreatePolicyDefinition(cfg PolicyDefinitionConfig) (er
 			return err
 		}
 		db.LocalPolicyDB.updateLocalDB(patriciaDB.Prefix(cfg.Name), add)
-		if newPolicy.ImportPolicy {
-			db.Logger.Info(fmt.Sprintln("Adding ", newPolicy.Name, " as import policy"))
-			if db.ImportPolicyPrecedenceMap == nil {
-				db.ImportPolicyPrecedenceMap = make(map[int]string)
-			}
-			db.ImportPolicyPrecedenceMap[int(cfg.Precedence)] = cfg.Name
-		} else if newPolicy.ExportPolicy {
-			db.Logger.Info(fmt.Sprintln("Adding ", newPolicy.Name, " as export policy"))
-			if db.ExportPolicyPrecedenceMap == nil {
-				db.ExportPolicyPrecedenceMap = make(map[int]string)
-			}
-			db.ExportPolicyPrecedenceMap[int(cfg.Precedence)] = cfg.Name
-		}
-		db.PolicyEngineTraverseAndApplyPolicy(newPolicy)
 	} else {
 		db.Logger.Err(fmt.Sprintln("Duplicate Policy definition name"))
 		err = errors.New("Duplicate policy definition")
@@ -521,7 +614,22 @@ func (db *PolicyEngineDB) CreatePolicyDefinition(cfg PolicyDefinitionConfig) (er
 	}
 	return err
 }
-
+func (db *PolicyEngineDB) ValidatePolicyDefinitionDelete(cfg PolicyDefinitionConfig) (err error) {
+	db.Logger.Println("ValidatePolicyDefinitionDelete")
+	policyItem := db.PolicyDB.Get(patriciaDB.Prefix(cfg.Name))
+	if policyItem == nil {
+		db.Logger.Println("Policy not defined")
+		err = errors.New("Policy not defined")
+		return err
+	}
+	policy := policyItem.(Policy)
+	if db.ApplyPolicyMap[policy.Name] != nil {
+		db.Logger.Println(" Policy being applied, cannot delete it")
+		err = errors.New(fmt.Sprintln("Policy being used, cannot delete"))
+		return err
+	}
+	return err
+}
 func (db *PolicyEngineDB) DeletePolicyDefinition(cfg PolicyDefinitionConfig) (err error) {
 	db.Logger.Info(fmt.Sprintln("DeletePolicyDefinition for name ", cfg.Name))
 	ok := db.PolicyDB.Match(patriciaDB.Prefix(cfg.Name))

@@ -1,15 +1,38 @@
+//
+//Copyright [2016] [SnapRoute Inc]
+//
+//Licensed under the Apache License, Version 2.0 (the "License");
+//you may not use this file except in compliance with the License.
+//You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+//	 Unless required by applicable law or agreed to in writing, software
+//	 distributed under the License is distributed on an "AS IS" BASIS,
+//	 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//	 See the License for the specific language governing permissions and
+//	 limitations under the License.
+//
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
+//                                                                                                           
+
 // policyUtils.go
 package policy
 
 import (
 	"bytes"
 	"errors"
-//	"log"
-//	"log/syslog"
-//	"os"
+	//	"log"
+	//	"log/syslog"
+	//	"os"
+	"fmt"
 	"utils/logging"
 	"utils/patriciaDB"
-	"fmt"
 	"utils/policy/policyCommonDefs"
 )
 
@@ -32,7 +55,6 @@ type ConditionsAndActionsList struct {
 type PolicyStmtMap struct {
 	PolicyStmtMap map[string]ConditionsAndActionsList
 }
-
 type PolicyEngineFilterEntityParams struct {
 	DestNetIp        string //CIDR format
 	NextHopIp        string
@@ -51,7 +73,11 @@ type PolicyDetails struct {
 	ActionList    []PolicyAction
 	EntityDeleted bool //whether this policy/stmt resulted in deleting the entity
 }
-
+type ApplyPolicyInfo struct {
+	ApplyPolicy Policy
+	Action      PolicyAction
+	Conditions  []string //extra condition names
+}
 type LocalDB struct {
 	Prefix     patriciaDB.Prefix
 	IsValid    bool
@@ -88,7 +114,7 @@ func (slice *LocalDBSlice) updateLocalDB(prefix patriciaDB.Prefix, op int) {
 }
 
 type Policyfunc func(actionInfo interface{}, conditionInfo []interface{}, params interface{})
-type PolicyConditionCheckfunc func(entity PolicyEngineFilterEntityParams, condition PolicyCondition, policyStmt PolicyStmt) bool
+type PolicyConditionCheckfunc func(entity PolicyEngineFilterEntityParams, condition PolicyCondition) bool
 type UndoActionfunc func(actionInfo interface{}, conditionList []interface{}, params interface{}, policyStmt PolicyStmt)
 type PolicyCheckfunc func(params interface{}) bool
 type EntityUpdatefunc func(details PolicyDetails, params interface{})
@@ -99,7 +125,7 @@ type PolicyEntityMapIndex interface{}
 type GetPolicyEnityMapIndexFunc func(entity PolicyEngineFilterEntityParams, policy string) PolicyEntityMapIndex
 
 type PolicyEngineDB struct {
-	Logger                        *logging.Writer//*log.Logger
+	Logger                        *logging.Writer //*log.Logger
 	PolicyConditionsDB            *patriciaDB.Trie
 	LocalPolicyConditionsDB       *LocalDBSlice
 	PolicyActionsDB               *patriciaDB.Trie
@@ -113,6 +139,7 @@ type PolicyEngineDB struct {
 	ProtocolPolicyListDB          map[string][]string //policystmt names assoociated with every protocol type
 	ImportPolicyPrecedenceMap     map[int]string
 	ExportPolicyPrecedenceMap     map[int]string
+	ApplyPolicyMap                map[string][]ApplyPolicyInfo
 	PolicyEntityMap               map[PolicyEntityMapIndex]PolicyStmtMap
 	DefaultImportPolicyActionFunc Policyfunc
 	DefaultExportPolicyActionFunc Policyfunc
@@ -124,6 +151,8 @@ type PolicyEngineDB struct {
 	UndoActionfuncMap             map[int]UndoActionfunc
 	TraverseAndApplyPolicyFunc    EntityTraverseAndApplyPolicyfunc
 	TraverseAndReversePolicyFunc  EntityTraverseAndReversePolicyfunc
+    ValidConditionsForPolicyTypeMap  map[string][]int 		//map of policyType to list of valid conditions
+    ValidActionsForPolicyTypeMap     map[string][]int 		//map of policyType to list of valid actions
 }
 
 func (db *PolicyEngineDB) buildPolicyConditionCheckfuncMap() {
@@ -131,9 +160,18 @@ func (db *PolicyEngineDB) buildPolicyConditionCheckfuncMap() {
 	db.ConditionCheckfuncMap[policyCommonDefs.PolicyConditionTypeDstIpPrefixMatch] = db.DstIpPrefixMatchConditionfunc
 	db.ConditionCheckfuncMap[policyCommonDefs.PolicyConditionTypeProtocolMatch] = db.ProtocolMatchConditionfunc
 }
+func (db *PolicyEngineDB) buildPolicyValidConditionsForPolicyTypeMap() {
+	db.Logger.Info(fmt.Sprintln("buildPolicyValidConditionsForPolicyTypeMap"))
+	db.ValidConditionsForPolicyTypeMap["ALL"] = []int{policyCommonDefs.PolicyConditionTypeDstIpPrefixMatch, policyCommonDefs.PolicyConditionTypeProtocolMatch}
+}
+func (db *PolicyEngineDB) buildPolicyValidActionsForPolicyTypeMap() {
+	db.Logger.Info(fmt.Sprintln("buildPolicyValidActionsForPolicyTypeMap"))
+	db.ValidActionsForPolicyTypeMap["ALL"] = []int{policyCommonDefs.PolicyActionTypeRouteDisposition, policyCommonDefs.PolicyActionTypeRouteRedistribute}
+	db.ValidActionsForPolicyTypeMap["BGP"] = []int{policyCommonDefs.PolicyActionTypeAggregate}
+}
 func NewPolicyEngineDB(logger *logging.Writer) (policyEngineDB *PolicyEngineDB) {
 	policyEngineDB = &PolicyEngineDB{}
-/*	if policyEngineDB.Logger == nil {
+	/*	if policyEngineDB.Logger == nil {
 		policyEngineDB.Logger = log.New(os.Stdout, "PolicyEngine :", log.Ldate|log.Ltime|log.Lshortfile)
 
 		syslogger, err := syslog.New(syslog.LOG_NOTICE|syslog.LOG_INFO|syslog.LOG_DAEMON, "PolicyEngine")
@@ -169,8 +207,13 @@ func NewPolicyEngineDB(logger *logging.Writer) (policyEngineDB *PolicyEngineDB) 
 	policyEngineDB.ProtocolPolicyListDB = make(map[string][]string)
 	policyEngineDB.ImportPolicyPrecedenceMap = make(map[int]string)
 	policyEngineDB.ExportPolicyPrecedenceMap = make(map[int]string)
+	policyEngineDB.ApplyPolicyMap = make(map[string][]ApplyPolicyInfo)
 	policyEngineDB.ConditionCheckfuncMap = make(map[int]PolicyConditionCheckfunc)
+	policyEngineDB.ValidConditionsForPolicyTypeMap = make(map[string][]int)
+	policyEngineDB.ValidActionsForPolicyTypeMap = make(map[string][]int)
 	policyEngineDB.buildPolicyConditionCheckfuncMap()
+	policyEngineDB.buildPolicyValidConditionsForPolicyTypeMap()
+	policyEngineDB.buildPolicyValidActionsForPolicyTypeMap()
 	policyEngineDB.ActionfuncMap = make(map[int]Policyfunc)
 	policyEngineDB.UndoActionfuncMap = make(map[int]UndoActionfunc)
 	return policyEngineDB
@@ -244,6 +287,7 @@ func (db *PolicyEngineDB) AddPolicyEntityMapEntry(entity PolicyEngineFilterEntit
 	}
 	policyStmtMap.PolicyStmtMap[policyStmt] = conditionsAndActionsList
 	db.PolicyEntityMap[policyEntityMapIndex] = policyStmtMap
+	db.Logger.Info(fmt.Sprintln("Adding entry for index ", policyEntityMapIndex))
 }
 func (db *PolicyEngineDB) DeletePolicyEntityMapEntry(entity PolicyEngineFilterEntityParams, policy string) {
 	db.Logger.Info(fmt.Sprintln("DeletePolicyEntityMapEntry for policy ", policy))
@@ -291,7 +335,38 @@ func (db *PolicyEngineDB) PolicyActionType(actionType int) (exportTypeAction boo
 	}
 	return exportTypeAction, importTypeAction, globalTypeAction
 }
-func (db *PolicyEngineDB) SetAndValidatePolicyType(policy *Policy, stmt PolicyStmt) (err error) {
+func PolicyActionStrToIntType(action string) (actionType int, err error) {
+	switch action {
+	case "RouteDisposition":
+		actionType = policyCommonDefs.PolicyActionTypeRouteDisposition
+		break
+	case "Redistribution":
+		actionType = policyCommonDefs.PolicyActionTypeRouteRedistribute
+		break
+	case "SetAdminDistance":
+		actionType = policyCommonDefs.PoilcyActionTypeSetAdminDistance
+		break
+	case "NetworkStatementAdvertise":
+		actionType = policyCommonDefs.PolicyActionTypeNetworkStatementAdvertise
+		break
+	case "Aggregate":
+		actionType = policyCommonDefs.PolicyActionTypeAggregate
+		break
+	default:
+		return -1, errors.New("Unknown ActionType")
+	}
+	return actionType, nil
+}
+func HasActionInfo(infoLIst []ApplyPolicyInfo, action PolicyAction) bool {
+	for i := 0; i < len(infoLIst); i++ {
+		if infoLIst[i].Action.ActionType == action.ActionType && infoLIst[i].Action.ActionInfo == action.ActionInfo {
+			return true
+		}
+	}
+	return false
+}
+
+/*func (db *PolicyEngineDB) SetAndValidatePolicyType(policy *Policy, stmt PolicyStmt) (err error) {
 	db.Logger.Info(fmt.Sprintln("SetPolicyTypeFromPolicyStmt"))
 	if policy.ExportPolicy == false && policy.ImportPolicy == false && policy.GlobalPolicy == false {
 		db.Logger.Info(fmt.Sprintln("Policy is still not associated with a type, set it from stmt"))
@@ -326,4 +401,26 @@ func (db *PolicyEngineDB) SetAndValidatePolicyType(policy *Policy, stmt PolicySt
 		return err
 	}
 	return err
+}
+*/
+func (db *PolicyEngineDB) ConditionCheckForPolicyType(conditionName string,policyType string ) bool {
+    validList := db.ValidConditionsForPolicyTypeMap[policyType]
+	if validList == nil || len(validList) == 0 {
+		db.Logger.Err(fmt.Sprintln("Valid Conditions not defined for policyType: ", policyType))
+		return false
+	}
+	item := db.PolicyConditionsDB.Get(patriciaDB.Prefix(conditionName))
+	if item == nil {
+		db.Logger.Err(fmt.Sprintln("Condtition with conditionName ", conditionName, " not defined"))
+		return false
+	}
+	condition := item.(PolicyCondition)
+	for j := 0;j<len(validList);j++ {
+		if validList[j] == condition.ConditionType {
+	         db.Logger.Info(fmt.Sprintln("Condition ", conditionName, " valid for policyType: ", policyType))
+			return true
+		}
+	}
+	db.Logger.Info(fmt.Sprintln("Condition ", conditionName, " not valid for policyType: ", policyType))
+	return false
 }

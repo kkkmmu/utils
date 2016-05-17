@@ -1,3 +1,26 @@
+//
+//Copyright [2016] [SnapRoute Inc]
+//
+//Licensed under the Apache License, Version 2.0 (the "License");
+//you may not use this file except in compliance with the License.
+//You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+//	 Unless required by applicable law or agreed to in writing, software
+//	 distributed under the License is distributed on an "AS IS" BASIS,
+//	 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//	 See the License for the specific language governing permissions and
+//	 limitations under the License.
+//
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
+//                                                                                                           
+
 package logging
 
 import (
@@ -11,6 +34,12 @@ import (
 	"models"
 	"os"
 	"sysd"
+	"time"
+)
+
+const (
+	DB_CONNECT_TIME_INTERVAL   = 2
+	DB_CONNECT_RETRY_LOG_COUNT = 100
 )
 
 func ConvertLevelStrToVal(str string) sysdCommonDefs.SRDebugLevel {
@@ -88,11 +117,13 @@ func (logger *Writer) readSystemLoggingFromDb(dbHdl redis.Conn) error {
 		logger.Err("DB query failed for SystemLogging config")
 		return err
 	}
-	obj := sysd.NewSystemLogging()
-	dbObject := objList[0].(models.SystemLogging)
-	models.ConvertsysdSystemLoggingObjToThrift(&dbObject, obj)
-	if obj.Logging == "on" {
-		logger.GlobalLogging = true
+	if objList != nil {
+		obj := sysd.NewSystemLogging()
+		dbObject := objList[0].(models.SystemLogging)
+		models.ConvertsysdSystemLoggingObjToThrift(&dbObject, obj)
+		if obj.Logging == "on" {
+			logger.GlobalLogging = true
+		}
 	}
 	return nil
 }
@@ -105,24 +136,37 @@ func (logger *Writer) readComponentLoggingFromDb(dbHdl redis.Conn) error {
 		logger.Err("DB query failed for ComponentLogging config")
 		return err
 	}
-	for idx := 0; idx < len(objList); idx++ {
-		obj := sysd.NewComponentLogging()
-		dbObject := objList[idx].(models.ComponentLogging)
-		models.ConvertsysdComponentLoggingObjToThrift(&dbObject, obj)
-		if obj.Module == logger.MyComponentName {
-			logger.MyLogLevel = ConvertLevelStrToVal(obj.Level)
-			return nil
+	if objList != nil {
+		for idx := 0; idx < len(objList); idx++ {
+			obj := sysd.NewComponentLogging()
+			dbObject := objList[idx].(models.ComponentLogging)
+			models.ConvertsysdComponentLoggingObjToThrift(&dbObject, obj)
+			if obj.Module == logger.MyComponentName {
+				logger.MyLogLevel = ConvertLevelStrToVal(obj.Level)
+				return nil
+			}
 		}
 	}
 	return nil
 }
 
 func (logger *Writer) readLogLevelFromDb() error {
-	dbHdl, err := redis.Dial("tcp", "6379")
-	if err != nil {
-		logger.Err("Failed to dial out to Redis server")
-		return err
+	var dbHdl redis.Conn
+	var err error
+	retryCount := 0
+	ticker := time.NewTicker(DB_CONNECT_TIME_INTERVAL * time.Second)
+	for _ = range ticker.C {
+		retryCount += 1
+		dbHdl, err = redis.Dial("tcp", ":6379")
+		if err != nil {
+			if retryCount%DB_CONNECT_RETRY_LOG_COUNT == 0 {
+				logger.Err(fmt.Sprintln("Failed to dial out to Redis server. Ret    rying connection. Num retries = ", retryCount))
+			}
+		} else {
+			break
+		}
 	}
+
 	if dbHdl != nil {
 		logger.readSystemLoggingFromDb(dbHdl)
 		logger.readComponentLoggingFromDb(dbHdl)
@@ -133,13 +177,13 @@ func (logger *Writer) readLogLevelFromDb() error {
 
 func (logger *Writer) SetGlobal(Enable bool) error {
 	logger.GlobalLogging = Enable
-	fmt.Println("Changed global logging to: ", logger.GlobalLogging, " for ", logger.MyComponentName)
+	logger.Debug(fmt.Sprintln("Changed global logging to: ", logger.GlobalLogging, " for ", logger.MyComponentName))
 	return nil
 }
 
 func (logger *Writer) SetLevel(level sysdCommonDefs.SRDebugLevel) error {
 	logger.MyLogLevel = level
-	fmt.Println("Changed logging level to: ", logger.MyLogLevel, " for ", logger.MyComponentName)
+	logger.Debug(fmt.Sprintln("Changed logging level to: ", logger.MyLogLevel, " for ", logger.MyComponentName))
 	return nil
 }
 

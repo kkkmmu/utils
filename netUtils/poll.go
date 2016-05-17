@@ -21,58 +21,51 @@
 // |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
 //                                                                                                           
 
-package dbutils
+package netUtils
 
 import (
-	"database/sql"
-	"database/sql/driver"
-	"fmt"
+	"errors"
+	"syscall"
 )
 
-func ConvertBoolToInt(val bool) int {
-	if val {
-		return 1
-	}
-	return 0
+const MAXEPOLLEVENTS = 32
+
+type EPoll struct {
+	fd     int
+	event  syscall.EpollEvent
+	events [MAXEPOLLEVENTS]syscall.EpollEvent
 }
-func ConvertIntToBool(val int) bool {
-	if val == 1 {
-		return true
+
+func NewEPoll(fd int) (*EPoll, error) {
+	var err error
+	var eFd int
+	if eFd, err = syscall.EpollCreate1(0); err != nil {
+		return nil, err
 	}
-	return false
-}
-func ConvertStringToBool(val string) bool {
-	if val == "true" {
-		return true
+
+	e := EPoll{}
+	e.fd = eFd
+	e.event.Events = syscall.EPOLLOUT
+	e.event.Fd = int32(fd)
+	if err = syscall.EpollCtl(eFd, syscall.EPOLL_CTL_ADD, fd, &e.event); err != nil {
+		e.Close()
+		return nil, err
 	}
-	return false
+
+	return &e, nil
 }
-func ConvertStrBoolIntToBool(val string) bool {
-	if val == "true" {
-		return true
-	} else if val == "True" {
-		return true
-	} else if val == "1" {
-		return true
-	}
-	return false
+
+func (e *EPoll) Close() error {
+	return syscall.Close(e.fd)
 }
-func ExecuteSQLStmt(dbCmd string, dbHdl *sql.DB) (driver.Result, error) {
-	var result driver.Result
-	txn, err := dbHdl.Begin()
+
+func (e *EPoll) Wait(msec int) error {
+	nevents, err := syscall.EpollWait(e.fd, e.events[:], msec)
 	if err != nil {
-		fmt.Println("### Failed to strart db transaction for command", dbCmd)
-		return result, err
+		return err
 	}
-	result, err = dbHdl.Exec(dbCmd)
-	if err != nil {
-		fmt.Println("### Failed to execute command ", dbCmd, err)
-		return result, err
+	if nevents <= 0 {
+		return errors.New("i/o timeout")
 	}
-	err = txn.Commit()
-	if err != nil {
-		fmt.Println("### Failed to Commit transaction for command", dbCmd, err)
-		return result, err
-	}
-	return result, err
+	return nil
 }
