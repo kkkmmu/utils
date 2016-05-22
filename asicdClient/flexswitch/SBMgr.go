@@ -7,21 +7,21 @@
 //
 //    http://www.apache.org/licenses/LICENSE-2.0
 //
-//	 Unless required by applicable law or agreed to in writing, software
-//	 distributed under the License is distributed on an "AS IS" BASIS,
-//	 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//	 See the License for the specific language governing permissions and
-//	 limitations under the License.
+//       Unless required by applicable law or agreed to in writing, software
+//       distributed under the License is distributed on an "AS IS" BASIS,
+//       WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//       See the License for the specific language governing permissions and
+//       limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
-package asicdClientManager
+package flexswitch
 
 import (
 	"asicdInt"
@@ -32,6 +32,7 @@ import (
 	"io/ioutil"
 	"strconv"
 	"time"
+	"utils/commonDefs"
 	"utils/ipcutils"
 	"utils/logging"
 )
@@ -68,17 +69,17 @@ func (asicdClientMgr *FSAsicdClientMgr) DeleteIPv4Neighbor(ipAddr string) (int32
 	return asicdClientMgr.ClientHdl.DeleteIPv4Neighbor(ipAddr, "00:00:00:00:00:00", 0, 0)
 }
 
-func (asicdClientMgr *FSAsicdClientMgr) GetBulkIPv4IntfState(curMark, count int) (*IPv4IntfStateGetInfo, error) {
+func (asicdClientMgr *FSAsicdClientMgr) GetBulkIPv4IntfState(curMark, count int) (*commonDefs.IPv4IntfStateGetInfo, error) {
 	bulkInfo, err := asicdClientMgr.ClientHdl.GetBulkIPv4IntfState(asicdServices.Int(curMark), asicdServices.Int(count))
 	if bulkInfo == nil {
 		return nil, err
 	}
-	var ipv4Info IPv4IntfStateGetInfo
+	var ipv4Info commonDefs.IPv4IntfStateGetInfo
 	ipv4Info.StartIdx = int32(bulkInfo.StartIdx)
 	ipv4Info.EndIdx = int32(bulkInfo.EndIdx)
 	ipv4Info.Count = int32(bulkInfo.Count)
 	ipv4Info.More = bulkInfo.More
-	ipv4Info.IPv4IntfStateList = make([]IPv4IntfState, int(ipv4Info.Count))
+	ipv4Info.IPv4IntfStateList = make([]commonDefs.IPv4IntfState, int(ipv4Info.Count))
 	for idx := 0; idx < int(ipv4Info.Count); idx++ {
 		ipv4Info.IPv4IntfStateList[idx].IntfRef = bulkInfo.IPv4IntfStateList[idx].IntfRef
 		ipv4Info.IPv4IntfStateList[idx].IfIndex = bulkInfo.IPv4IntfStateList[idx].IfIndex
@@ -94,19 +95,20 @@ func (asicdClientMgr *FSAsicdClientMgr) GetBulkIPv4IntfState(curMark, count int)
 	return &ipv4Info, nil
 }
 
-func (asicdClientMgr *FSAsicdClientMgr) GetBulkPort(curMark, count int) (*PortGetInfo, error) {
+func (asicdClientMgr *FSAsicdClientMgr) GetBulkPort(curMark, count int) (*commonDefs.PortGetInfo, error) {
 	bulkInfo, err := asicdClientMgr.ClientHdl.GetBulkPort(asicdServices.Int(curMark), asicdServices.Int(count))
 	if bulkInfo == nil {
 		return nil, err
 	}
-	var portInfo PortGetInfo
+	var portInfo commonDefs.PortGetInfo
 	portInfo.StartIdx = int32(bulkInfo.StartIdx)
 	portInfo.EndIdx = int32(bulkInfo.EndIdx)
 	portInfo.Count = int32(bulkInfo.Count)
 	portInfo.More = bulkInfo.More
-	portInfo.PortList = make([]Port, int(portInfo.Count))
+	portInfo.PortList = make([]commonDefs.Port, int(portInfo.Count))
 	for idx := 0; idx < int(portInfo.Count); idx++ {
-		portInfo.PortList[idx].PortNum = bulkInfo.PortList[idx].PortNum
+		portInfo.PortList[idx].IntfRef = bulkInfo.PortList[idx].IntfRef
+		portInfo.PortList[idx].IfIndex = bulkInfo.PortList[idx].IfIndex
 		portInfo.PortList[idx].Description = bulkInfo.PortList[idx].Description
 		portInfo.PortList[idx].PhyIntfType = bulkInfo.PortList[idx].PhyIntfType
 		portInfo.PortList[idx].AdminState = bulkInfo.PortList[idx].AdminState
@@ -120,19 +122,19 @@ func (asicdClientMgr *FSAsicdClientMgr) GetBulkPort(curMark, count int) (*PortGe
 	return &portInfo, nil
 }
 
-func (asicdClientMgr *FSAsicdClientMgr) GetBulkPortState(curMark, count int) (*PortStateGetInfo, error) {
+func (asicdClientMgr *FSAsicdClientMgr) GetBulkPortState(curMark, count int) (*commonDefs.PortStateGetInfo, error) {
 	bulkInfo, err := asicdClientMgr.ClientHdl.GetBulkPortState(asicdServices.Int(curMark), asicdServices.Int(count))
 	if bulkInfo == nil {
 		return nil, err
 	}
-	var portStateInfo PortStateGetInfo
+	var portStateInfo commonDefs.PortStateGetInfo
 	portStateInfo.StartIdx = int32(bulkInfo.StartIdx)
 	portStateInfo.EndIdx = int32(bulkInfo.EndIdx)
 	portStateInfo.Count = int32(bulkInfo.Count)
 	portStateInfo.More = bulkInfo.More
-	portStateInfo.PortStateList = make([]PortState, int(portStateInfo.Count))
+	portStateInfo.PortStateList = make([]commonDefs.PortState, int(portStateInfo.Count))
 	for idx := 0; idx < int(portStateInfo.Count); idx++ {
-		portStateInfo.PortStateList[idx].PortNum = bulkInfo.PortStateList[idx].PortNum
+		portStateInfo.PortStateList[idx].IntfRef = bulkInfo.PortStateList[idx].IntfRef
 		portStateInfo.PortStateList[idx].IfIndex = bulkInfo.PortStateList[idx].IfIndex
 		portStateInfo.PortStateList[idx].Name = bulkInfo.PortStateList[idx].Name
 		portStateInfo.PortStateList[idx].OperState = bulkInfo.PortStateList[idx].OperState
@@ -155,17 +157,17 @@ func (asicdClientMgr *FSAsicdClientMgr) GetBulkPortState(curMark, count int) (*P
 	return &portStateInfo, nil
 }
 
-func (asicdClientMgr *FSAsicdClientMgr) GetBulkVlanState(curMark, count int) (*VlanStateGetInfo, error) {
+func (asicdClientMgr *FSAsicdClientMgr) GetBulkVlanState(curMark, count int) (*commonDefs.VlanStateGetInfo, error) {
 	bulkInfo, err := asicdClientMgr.ClientHdl.GetBulkVlanState(asicdServices.Int(curMark), asicdServices.Int(count))
 	if bulkInfo == nil {
 		return nil, err
 	}
-	var vlanStateInfo VlanStateGetInfo
+	var vlanStateInfo commonDefs.VlanStateGetInfo
 	vlanStateInfo.StartIdx = int32(bulkInfo.StartIdx)
 	vlanStateInfo.EndIdx = int32(bulkInfo.EndIdx)
 	vlanStateInfo.Count = int32(bulkInfo.Count)
 	vlanStateInfo.More = bulkInfo.More
-	vlanStateInfo.VlanStateList = make([]VlanState, int(vlanStateInfo.Count))
+	vlanStateInfo.VlanStateList = make([]commonDefs.VlanState, int(vlanStateInfo.Count))
 	for idx := 0; idx < int(vlanStateInfo.Count); idx++ {
 		vlanStateInfo.VlanStateList[idx].VlanId = bulkInfo.VlanStateList[idx].VlanId
 		vlanStateInfo.VlanStateList[idx].VlanName = bulkInfo.VlanStateList[idx].VlanName
@@ -176,17 +178,17 @@ func (asicdClientMgr *FSAsicdClientMgr) GetBulkVlanState(curMark, count int) (*V
 	return &vlanStateInfo, nil
 }
 
-func (asicdClientMgr *FSAsicdClientMgr) GetBulkVlan(curMark, count int) (*VlanGetInfo, error) {
+func (asicdClientMgr *FSAsicdClientMgr) GetBulkVlan(curMark, count int) (*commonDefs.VlanGetInfo, error) {
 	bulkInfo, err := asicdClientMgr.ClientHdl.GetBulkVlan(asicdInt.Int(curMark), asicdInt.Int(count))
 	if bulkInfo == nil {
 		return nil, err
 	}
-	var vlanInfo VlanGetInfo
+	var vlanInfo commonDefs.VlanGetInfo
 	vlanInfo.StartIdx = int32(bulkInfo.StartIdx)
 	vlanInfo.EndIdx = int32(bulkInfo.EndIdx)
 	vlanInfo.Count = int32(bulkInfo.Count)
 	vlanInfo.More = bulkInfo.More
-	vlanInfo.VlanList = make([]Vlan, int(vlanInfo.Count))
+	vlanInfo.VlanList = make([]commonDefs.Vlan, int(vlanInfo.Count))
 	for idx := 0; idx < int(vlanInfo.Count); idx++ {
 		vlanInfo.VlanList[idx].VlanId = bulkInfo.VlanList[idx].VlanId
 		vlanInfo.VlanList[idx].IfIndexList = append(vlanInfo.VlanList[idx].IfIndexList, bulkInfo.VlanList[idx].IfIndexList...)
@@ -195,7 +197,7 @@ func (asicdClientMgr *FSAsicdClientMgr) GetBulkVlan(curMark, count int) (*VlanGe
 	return &vlanInfo, nil
 }
 
-func getAsicdThriftClientHdl(paramsFile string, logger *logging.Writer) *asicdServices.ASICDServicesClient {
+func GetAsicdThriftClientHdl(paramsFile string, logger *logging.Writer) *asicdServices.ASICDServicesClient {
 	var asicdClient AsicdClient
 	logger.Debug(fmt.Sprintln("Inside connectToServers...paramsFile", paramsFile))
 	var clientsList []ClientJson
