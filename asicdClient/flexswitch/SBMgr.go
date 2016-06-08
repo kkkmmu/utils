@@ -24,6 +24,7 @@
 package flexswitch
 
 import (
+	"asicd/asicdCommonDefs"
 	"asicdInt"
 	"asicdServices"
 	"encoding/json"
@@ -31,6 +32,7 @@ import (
 	"git.apache.org/thrift.git/lib/go/thrift"
 	"io/ioutil"
 	"strconv"
+	"strings"
 	"time"
 	"utils/commonDefs"
 	"utils/ipcutils"
@@ -67,6 +69,21 @@ func (asicdClientMgr *FSAsicdClientMgr) UpdateIPv4Neighbor(ipAddr, macAddr strin
 
 func (asicdClientMgr *FSAsicdClientMgr) DeleteIPv4Neighbor(ipAddr string) (int32, error) {
 	return asicdClientMgr.ClientHdl.DeleteIPv4Neighbor(ipAddr, "00:00:00:00:00:00", 0, 0)
+}
+
+func (asicdClientMgr *FSAsicdClientMgr) convertAsicdInfoToCommonInfo(info asicdServices.IPv4IntfState) *commonDefs.IPv4IntfState {
+	entry := &commonDefs.IPv4IntfState{}
+	entry.IntfRef = info.IntfRef
+	entry.IfIndex = info.IfIndex
+	entry.IpAddr = info.IpAddr
+	entry.OperState = info.OperState
+	entry.NumUpEvents = info.NumUpEvents
+	entry.LastUpEventTime = info.LastUpEventTime
+	entry.NumDownEvents = info.NumDownEvents
+	entry.LastDownEventTime = info.LastDownEventTime
+	entry.L2IntfType = info.L2IntfType
+	entry.L2IntfId = info.L2IntfId
+	return entry
 }
 
 func (asicdClientMgr *FSAsicdClientMgr) GetBulkIPv4IntfState(curMark, count int) (*commonDefs.IPv4IntfStateGetInfo, error) {
@@ -242,4 +259,78 @@ func GetAsicdThriftClientHdl(paramsFile string, logger *logging.Writer) *asicdSe
 		}
 	}
 	return nil
+}
+
+/*  API to return all ipv4 addresses created on the system... If a dameons uses this then they do not have to worry
+ *  about checking is any ipv4 addresses are left on the system or not
+ */
+func (asicdClientMgr *FSAsicdClientMgr) GetAllIPv4IntfState() ([]*commonDefs.IPv4IntfState, error) {
+	curMark := 0
+	count := 100
+	ipv4Info := make([]*commonDefs.IPv4IntfState, 0)
+	for {
+		bulkInfo, err := asicdClientMgr.ClientHdl.GetBulkIPv4IntfState(asicdServices.Int(curMark),
+			asicdServices.Int(count))
+		if bulkInfo == nil {
+			return nil, err
+		}
+		curMark = int(bulkInfo.EndIdx)
+		for idx := 0; idx < int(bulkInfo.Count); idx++ {
+			ipv4Info = append(ipv4Info,
+				asicdClientMgr.convertAsicdInfoToCommonInfo(*bulkInfo.IPv4IntfStateList[idx]))
+		}
+		if bulkInfo.More == false {
+			break
+		}
+	}
+
+	return ipv4Info, nil
+}
+
+/*  Library util to determine router id.
+ *  Calculation Method:
+ *	    1) Get all loopback interfaces on the system and return the highest value
+ *		a) If no loopback configured on the system, in that case get all ipv4 interfaces and return the highest
+ *		   value
+ *		    b) if no ipv4 interfaces then return default router id which is 0.0.0.0
+ */
+func (asicdClientMgr *FSAsicdClientMgr) DetermineRouterId() string {
+	rtrId := "0.0.0.0"
+	allipv4Intfs, err := asicdClientMgr.GetAllIPv4IntfState()
+	if err != nil {
+		return rtrId
+	}
+	loopbackIntfs := make([]string, 0)
+	ipv4Intfs := make([]string, 0)
+	// Get loopback interfaces & ipv4 interfaces
+	for _, ipv4Intf := range allipv4Intfs {
+		switch asicdCommonDefs.GetIntfTypeFromIfIndex(ipv4Intf.IfIndex) {
+		case commonDefs.IfTypeLoopback:
+			loopbackIntfs = append(loopbackIntfs, ipv4Intf.IpAddr)
+
+		case commonDefs.IfTypeVlan, commonDefs.IfTypePort:
+			ipv4Intfs = append(ipv4Intfs, ipv4Intf.IpAddr)
+		}
+	}
+
+	for _, ipAddr := range loopbackIntfs {
+		if strings.Compare(ipAddr, rtrId) > 0 {
+			// current loopback Ip Addr is greater than rtrId... time to update router id
+			rtrId = ipAddr
+		}
+	}
+
+	if rtrId != "0.0.0.0" {
+		// there was a loopback on the system which is higher then default rtrId and we are going to use that
+		// ipAddr as router id
+		return rtrId
+	}
+
+	for _, ipAddr := range ipv4Intfs {
+		if strings.Compare(ipAddr, rtrId) > 0 {
+			// current ipv4 ip addr is greater than rtrId... time to update router id
+			rtrId = ipAddr
+		}
+	}
+	return rtrId
 }

@@ -71,3 +71,12 @@ func (asicdClientMgr *OvsAsicdClientMgr) GetBulkVlan(curMark, count int) (*commo
 	fmt.Println("Vlan Get info", curMark, count, asicdClientMgr.Val)
 	return nil, nil
 }
+
+func (asicdClientMgr *OvsAsicdClientMgr) GetAllIPv4IntfState() ([]*commonDefs.IPv4IntfState, error) {
+	fmt.Println("Get all IPv4 Intf State called")
+	return nil, nil
+}
+
+func (asicdClientMgr *OvsAsicdClientMgr) DetermineRouterId() string {
+	return "0.0.0.0"
+}

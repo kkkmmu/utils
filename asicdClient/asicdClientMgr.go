@@ -27,14 +27,7 @@ import (
 	"utils/asicdClient/flexswitch"
 	"utils/asicdClient/ovs"
 	"utils/commonDefs"
-	"utils/logging"
 )
-
-type AsicdClientStruct struct {
-	Logger *logging.Writer
-	NHdl   commonDefs.AsicdNotificationHdl
-	NList  commonDefs.AsicdNotification
-}
 
 type AsicdClientIntf interface {
 	CreateIPv4Neighbor(ipAddr string, macAddr string, vlanId int32, ifIdx int32) (rv int32, err error)
@@ -42,11 +35,13 @@ type AsicdClientIntf interface {
 	DeleteIPv4Neighbor(ipAddr string) (rv int32, err error)
 
 	GetBulkIPv4IntfState(curMark, count int) (*commonDefs.IPv4IntfStateGetInfo, error)
+	GetAllIPv4IntfState() ([]*commonDefs.IPv4IntfState, error)
 
 	GetBulkPort(curMark, count int) (*commonDefs.PortGetInfo, error)
 	GetBulkPortState(curMark, count int) (*commonDefs.PortStateGetInfo, error)
 	GetBulkVlan(curMark, count int) (*commonDefs.VlanGetInfo, error)
 	GetBulkVlanState(curMark, count int) (*commonDefs.VlanStateGetInfo, error)
+	DetermineRouterId() string
 }
 
 func NewAsicdClientInit(plugin string, paramsFile string, asicdHdl commonDefs.AsicdClientStruct) AsicdClientIntf {

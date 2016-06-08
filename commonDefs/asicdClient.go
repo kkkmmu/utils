@@ -149,27 +149,6 @@ const (
 	NOTIFY_IPV4_ROUTE_DELETE_FAILURE
 )
 
-/*
-type AsicdNotification struct {
-	L2IntfStateChange      bool
-	L3IntfStateChange      bool
-	VlanCreate             bool
-	VlanDelete             bool
-	VlanUpdate             bool
-	LogicalIntfCreate      bool
-	LogicalIntfDelete      bool
-	LogicalIntfUpdate      bool
-	IPv4IntfCreate         bool
-	IPv4IntfDelete         bool
-	LagCreate              bool
-	LagDelete              bool
-	LagUpdate              bool
-	IPv4NbrMacMove         bool
-	IPv4RouteCreateFailure bool
-	IPv4RouteDeleteFailure bool
-}
-*/
-
 type AsicdNotification map[uint8]bool
 
 type L2IntfStateNotifyMsg struct {

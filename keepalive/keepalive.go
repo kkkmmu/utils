@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package keepalive
 
@@ -150,7 +150,6 @@ func (statusNotifier *DaemonStatusNotifier) ReceiveStatusNotifications() error {
 }
 
 func (statusNotifier *DaemonStatusNotifier) StartDaemonStatusListner() error {
-	statusNotifier.DaemonStatusCh = make(chan sysdCommonDefs.DaemonStatus, sysdCommonDefs.SYSD_TOTAL_KA_DAEMONS)
 	go statusNotifier.ReceiveStatusNotifications()
 	for {
 		rxBuf, err := statusNotifier.subSocket.Recv(0)
@@ -163,29 +162,22 @@ func (statusNotifier *DaemonStatusNotifier) StartDaemonStatusListner() error {
 
 func (statusNotifier *DaemonStatusNotifier) SetupDaemonStatusSub() error {
 	var err error
-	var socket *nanomsg.SubSocket
-	if socket, err = nanomsg.NewSubSocket(); err != nil {
-		return err
+	if statusNotifier.subSocket, err = nanomsg.NewSubSocket(); err == nil {
+		if err = statusNotifier.subSocket.Subscribe(""); err == nil {
+			if _, err = statusNotifier.subSocket.Connect(sysdCommonDefs.PUB_SOCKET_ADDR); err == nil {
+				if err = statusNotifier.subSocket.SetRecvBuffer(1024 * 1024); err == nil {
+					return nil
+				}
+			}
+		}
 	}
-
-	if err = socket.Subscribe(""); err != nil {
-		return err
-	}
-
-	if _, err = socket.Connect(sysdCommonDefs.PUB_SOCKET_ADDR); err != nil {
-		return err
-	}
-
-	if err = socket.SetRecvBuffer(1024 * 1024); err != nil {
-		return err
-	}
-	statusNotifier.subSocket = socket
-	statusNotifier.socketCh = make(chan []byte)
-	return nil
+	return err
 }
 
-func InitDaemonStatusListner() *DaemonStatusNotifier {
+func InitDaemonStatusListener() *DaemonStatusNotifier {
 	statusNotifier := new(DaemonStatusNotifier)
+	statusNotifier.socketCh = make(chan []byte, sysdCommonDefs.SYSD_TOTAL_KA_DAEMONS)
+	statusNotifier.DaemonStatusCh = make(chan sysdCommonDefs.DaemonStatus, sysdCommonDefs.SYSD_TOTAL_KA_DAEMONS)
 	err := statusNotifier.SetupDaemonStatusSub()
 	if err == nil {
 		return statusNotifier
