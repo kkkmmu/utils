@@ -33,7 +33,7 @@ import (
 	"utils/patriciaDB"
 	"utils/policy/policyCommonDefs"
 	//	"utils/commonDefs"
-	//	"net"
+	"net"
 	//	"asicdServices"
 	//	"asicd/asicdConstDefs"
 	"bytes"
@@ -229,10 +229,23 @@ func (db *PolicyEngineDB) FindPrefixMatch(ipAddr string, ipPrefix patriciaDB.Pre
 	return match
 }*/
 func (db *PolicyEngineDB) FindPrefixMatch(ipAddr string, ipPrefix patriciaDB.Prefix, condition PolicyCondition) (match bool) {
+	db.Logger.Println(fmt.Sprintln("ipAddr : ", ipAddr, " ipPrefix: ", ipPrefix, " condition.IpPrefix: ", condition.ConditionInfo.(MatchPrefixConditionInfo).IpPrefix, " conditionInfo,MaskLengthRange: ", condition.ConditionInfo.(MatchPrefixConditionInfo).Prefix.IpPrefix))
 	conditionInfo := condition.ConditionInfo.(MatchPrefixConditionInfo)
 	if conditionInfo.LowRange == -1 && conditionInfo.HighRange == -1 {
-		db.Logger.Info(fmt.Sprintln("Looking for exact match condition for prefix ", conditionInfo.IpPrefix))
+	    _, ipNet, err := net.ParseCIDR(condition.ConditionInfo.(MatchPrefixConditionInfo).Prefix.IpPrefix)
+	    if err != nil {
+		    return false
+ 	    }
 		if bytes.Equal(ipPrefix, conditionInfo.IpPrefix) {
+			db.Logger.Info(fmt.Sprintln(" Matched the prefix"))
+			return true
+		}
+		networkMask := ipNet.Mask
+	    vdestMask := net.IPv4Mask(networkMask[0], networkMask[1], networkMask[2], networkMask[3])
+        destIp := (net.IP(ipPrefix)).Mask(vdestMask)
+		db.Logger.Println(fmt.Sprintln("networkMask: ", networkMask, " vdestMask: ", vdestMask, " destIp: ", destIp))
+		db.Logger.Info(fmt.Sprintln("Looking for exact match condition for prefix ", conditionInfo.IpPrefix, " and ", destIp))
+		if bytes.Equal(destIp, conditionInfo.IpPrefix) {
 			db.Logger.Info(fmt.Sprintln(" Matched the prefix"))
 			return true
 		} else {
