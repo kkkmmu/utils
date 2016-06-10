@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package logging
 
@@ -31,7 +31,7 @@ import (
 	"infra/sysd/sysdCommonDefs"
 	"log"
 	"log/syslog"
-	"models"
+	"models/objects"
 	"os"
 	"sysd"
 	"time"
@@ -111,7 +111,7 @@ func NewLogger(name string, tag string, listenToConfig bool) (*Writer, error) {
 
 func (logger *Writer) readSystemLoggingFromDb(dbHdl redis.Conn) error {
 	logger.Info("Reading SystemLogging")
-	var dbObj models.SystemLogging
+	var dbObj objects.SystemLogging
 	objList, err := dbObj.GetAllObjFromDb(dbHdl)
 	if err != nil {
 		logger.Err("DB query failed for SystemLogging config")
@@ -119,8 +119,8 @@ func (logger *Writer) readSystemLoggingFromDb(dbHdl redis.Conn) error {
 	}
 	if objList != nil {
 		obj := sysd.NewSystemLogging()
-		dbObject := objList[0].(models.SystemLogging)
-		models.ConvertsysdSystemLoggingObjToThrift(&dbObject, obj)
+		dbObject := objList[0].(objects.SystemLogging)
+		objects.ConvertsysdSystemLoggingObjToThrift(&dbObject, obj)
 		if obj.Logging == "on" {
 			logger.GlobalLogging = true
 		}
@@ -130,7 +130,7 @@ func (logger *Writer) readSystemLoggingFromDb(dbHdl redis.Conn) error {
 
 func (logger *Writer) readComponentLoggingFromDb(dbHdl redis.Conn) error {
 	logger.Info("Reading ComponentLogging")
-	var dbObj models.ComponentLogging
+	var dbObj objects.ComponentLogging
 	objList, err := dbObj.GetAllObjFromDb(dbHdl)
 	if err != nil {
 		logger.Err("DB query failed for ComponentLogging config")
@@ -139,8 +139,8 @@ func (logger *Writer) readComponentLoggingFromDb(dbHdl redis.Conn) error {
 	if objList != nil {
 		for idx := 0; idx < len(objList); idx++ {
 			obj := sysd.NewComponentLogging()
-			dbObject := objList[idx].(models.ComponentLogging)
-			models.ConvertsysdComponentLoggingObjToThrift(&dbObject, obj)
+			dbObject := objList[idx].(objects.ComponentLogging)
+			objects.ConvertsysdComponentLoggingObjToThrift(&dbObject, obj)
 			if obj.Module == logger.MyComponentName {
 				logger.MyLogLevel = ConvertLevelStrToVal(obj.Level)
 				return nil

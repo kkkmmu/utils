@@ -13,20 +13,20 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package dbutils
 
 import (
 	"fmt"
 	"github.com/garyburd/redigo/redis"
-	"models"
+	"models/objects"
 	"time"
 	"utils/logging"
 )
@@ -86,36 +86,36 @@ func (db *DBUtil) Disconnect() {
 	}
 }
 
-func (db *DBUtil) StoreObjectInDb(obj models.ConfigObj) error {
+func (db *DBUtil) StoreObjectInDb(obj objects.ConfigObj) error {
 	return obj.StoreObjectInDb(db.Conn)
 }
 
-func (db *DBUtil) DeleteObjectFromDb(obj models.ConfigObj) error {
+func (db *DBUtil) DeleteObjectFromDb(obj objects.ConfigObj) error {
 	if db.Conn == nil {
 		return DBNotConnectedError{db.network, db.address}
 	}
 	return obj.DeleteObjectFromDb(db.Conn)
 }
 
-func (db *DBUtil) GetObjectFromDb(obj models.ConfigObj, objKey string) (models.ConfigObj, error) {
+func (db *DBUtil) GetObjectFromDb(obj objects.ConfigObj, objKey string) (objects.ConfigObj, error) {
 	if db.Conn == nil {
 		return obj, DBNotConnectedError{db.network, db.address}
 	}
 	return obj.GetObjectFromDb(objKey, db.Conn)
 }
 
-func (db *DBUtil) GetKey(obj models.ConfigObj) string {
+func (db *DBUtil) GetKey(obj objects.ConfigObj) string {
 	return obj.GetKey()
 }
 
-func (db *DBUtil) GetAllObjFromDb(obj models.ConfigObj) ([]models.ConfigObj, error) {
+func (db *DBUtil) GetAllObjFromDb(obj objects.ConfigObj) ([]objects.ConfigObj, error) {
 	if db.Conn == nil {
-		return make([]models.ConfigObj, 0), DBNotConnectedError{db.network, db.address}
+		return make([]objects.ConfigObj, 0), DBNotConnectedError{db.network, db.address}
 	}
 	return obj.GetAllObjFromDb(db.Conn)
 }
 
-func (db *DBUtil) CompareObjectsAndDiff(obj models.ConfigObj, updateKeys map[string]bool, inObj models.ConfigObj) (
+func (db *DBUtil) CompareObjectsAndDiff(obj objects.ConfigObj, updateKeys map[string]bool, inObj objects.ConfigObj) (
 	[]bool, error) {
 	if db.Conn == nil {
 		return make([]bool, 0), DBNotConnectedError{db.network, db.address}
@@ -123,21 +123,21 @@ func (db *DBUtil) CompareObjectsAndDiff(obj models.ConfigObj, updateKeys map[str
 	return obj.CompareObjectsAndDiff(updateKeys, inObj)
 }
 
-func (db *DBUtil) UpdateObjectInDb(obj, inObj models.ConfigObj, attrSet []bool) error {
+func (db *DBUtil) UpdateObjectInDb(obj, inObj objects.ConfigObj, attrSet []bool) error {
 	if db.Conn == nil {
 		return DBNotConnectedError{db.network, db.address}
 	}
 	return obj.UpdateObjectInDb(inObj, attrSet, db.Conn)
 }
 
-func (db *DBUtil) MergeDbAndConfigObj(obj, dbObj models.ConfigObj, attrSet []bool) (models.ConfigObj, error) {
+func (db *DBUtil) MergeDbAndConfigObj(obj, dbObj objects.ConfigObj, attrSet []bool) (objects.ConfigObj, error) {
 	return obj.MergeDbAndConfigObj(dbObj, attrSet)
 }
 
-func (db *DBUtil) GetBulkObjFromDb(obj models.ConfigObj, startIndex, count int64) (error, int64, int64, bool,
-	[]models.ConfigObj) {
+func (db *DBUtil) GetBulkObjFromDb(obj objects.ConfigObj, startIndex, count int64) (error, int64, int64, bool,
+	[]objects.ConfigObj) {
 	if db.Conn == nil {
-		return DBNotConnectedError{db.network, db.address}, 0, 0, false, make([]models.ConfigObj, 0)
+		return DBNotConnectedError{db.network, db.address}, 0, 0, false, make([]objects.ConfigObj, 0)
 	}
 	return obj.GetBulkObjFromDb(startIndex, count, db.Conn)
 }
