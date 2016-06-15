@@ -26,7 +26,7 @@ package ipcutils
 import (
 	//"fmt"
 	"git.apache.org/thrift.git/lib/go/thrift"
-	"models"
+	"models/objects"
 )
 
 type IPCClientBase struct {
@@ -41,13 +41,13 @@ func (clnt *IPCClientBase) IsConnectedToServer() bool {
 	return clnt.IsConnected
 }
 
-func (clnt *IPCClientBase) GetBulkObject(obj models.ConfigObj, currMarker int64, count int64) (err error,
+func (clnt *IPCClientBase) GetBulkObject(obj objects.ConfigObj, currMarker int64, count int64) (err error,
 	objCount int64,
 	nextMarker int64,
 	more bool,
-	objs []models.ConfigObj) {
+	objs []objects.ConfigObj) {
 	//logger.Println("### Get Bulk request called with", currMarker, count)
-	return nil, 0, 0, false, make([]models.ConfigObj, 0)
+	return nil, 0, 0, false, make([]objects.ConfigObj, 0)
 }
 
 //

@@ -146,7 +146,6 @@ func (dmn *FSDaemon) ConnectToAsicd() error {
 	}
 
 	for _, client := range clientsList {
-		dmn.Logger.Info(fmt.Sprintln("#### Client name is ", client.Name))
 		if client.Name == "asicd" {
 			dmn.Logger.Info(fmt.Sprintln("found  asicd at port ", client.Port))
 			dmn.Asicdclnt.Address = "localhost:" + strconv.Itoa(client.Port)
@@ -183,14 +182,14 @@ func (dmn *FSDaemon) CreateASICdSubscriber() error {
 		return err
 	}
 	for {
-		dmn.Logger.Debug("Read on ASICd subscriber socket...")
+		dmn.Logger.Info("Read on ASICd subscriber socket...")
 		asicdrxBuf, err := dmn.AsicdSubSocket.Recv(0)
 		if err != nil {
 			dmn.Logger.Err(fmt.Sprintln("Recv on ASICd subscriber socket failed with error:", err))
 			dmn.AsicdSubSocketErrCh <- err
 			continue
 		}
-		dmn.Logger.Debug(fmt.Sprintln("ASIC subscriber recv returned:", asicdrxBuf))
+		dmn.Logger.Info(fmt.Sprintln("ASIC subscriber recv returned:", asicdrxBuf))
 		dmn.AsicdSubSocketCh <- asicdrxBuf
 	}
 	return nil
@@ -221,8 +220,8 @@ func (dmn *FSDaemon) ListenForASICdUpdates(address string) error {
 	return nil
 }
 
-func (dmn *FSDaemon) InitSubscribers() (err error) {
-	err = dmn.CreateASICdSubscriber()
+func (dmn *FSDaemon) InitSubscribers([]string) (err error) {
+	go dmn.CreateASICdSubscriber()
 	return err
 }
 
