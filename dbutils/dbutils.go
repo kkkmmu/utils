@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"github.com/garyburd/redigo/redis"
 	"models/objects"
+	"reflect"
 	"time"
 	"utils/logging"
 )
@@ -73,8 +74,17 @@ func (db *DBUtil) Connect() error {
 				}
 			}
 		} else {
-			db.Conn = dbHdl
-			break
+			// ping to ensure that that the server is up and running
+			// this is the suggested way to determine that redis is 'ready'
+			dbHdl.Send("PING")
+			dbHdl.Flush()
+			response, err := dbHdl.Receive()
+			var pongReply interface{} = "PONG"
+			db.logger.Info(fmt.Sprintln("Received Response From Redis Server %#v", response))
+			if err == nil && reflect.DeepEqual(response, pongReply) {
+				db.Conn = dbHdl
+				break
+			}
 		}
 	}
 	return nil

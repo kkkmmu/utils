@@ -42,6 +42,18 @@ const (
 	DB_CONNECT_RETRY_LOG_COUNT = 100
 )
 
+type LoggerIntf interface {
+	Crit(string) error
+	Err(string) error
+	Warning(string) error
+	Alert(string) error
+	Emerg(string) error
+	Notice(string) error
+	Info(string) error
+	Println(string) error
+	Debug(string) error
+}
+
 func ConvertLevelStrToVal(str string) sysdCommonDefs.SRDebugLevel {
 	var val sysdCommonDefs.SRDebugLevel
 	switch str {
@@ -70,7 +82,7 @@ func ConvertLevelStrToVal(str string) sysdCommonDefs.SRDebugLevel {
 }
 
 type Writer struct {
-	sysLogger       *syslog.Writer
+	SysLogger       *syslog.Writer
 	nullLogger      *log.Logger
 	GlobalLogging   bool
 	MyComponentName string
@@ -86,12 +98,12 @@ func NewLogger(name string, tag string, listenToConfig bool) (*Writer, error) {
 	srLogger.MyComponentName = name
 	srLogger.initialized = false
 
-	srLogger.sysLogger, err = syslog.New(syslog.LOG_INFO|syslog.LOG_DAEMON, tag)
+	srLogger.SysLogger, err = syslog.New(syslog.LOG_INFO|syslog.LOG_DAEMON, tag)
 	if err != nil {
 		fmt.Println("Failed to initialize syslog - ", err)
 		return srLogger, err
 	}
-	// if sysLogger can't be initialized then send all logs to /dev/null
+	// if SysLogger can't be initialized then send all logs to /dev/null
 	devNull, err := os.Open(os.DevNull)
 	if err == nil {
 		srLogger.nullLogger = log.New(devNull, tag, log.Ldate|log.Ltime|log.Lshortfile)
@@ -190,7 +202,7 @@ func (logger *Writer) SetLevel(level sysdCommonDefs.SRDebugLevel) error {
 func (logger *Writer) Crit(message string) error {
 	if logger.initialized {
 		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.CRIT {
-			return logger.sysLogger.Crit(message)
+			return logger.SysLogger.Crit(message)
 		}
 	} else if logger.nullLogger != nil {
 		logger.nullLogger.Println(message)
@@ -201,7 +213,7 @@ func (logger *Writer) Crit(message string) error {
 func (logger *Writer) Err(message string) error {
 	if logger.initialized {
 		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.ERR {
-			return logger.sysLogger.Err(message)
+			return logger.SysLogger.Err(message)
 		} else if logger.nullLogger != nil {
 			logger.nullLogger.Println(message)
 		}
@@ -212,7 +224,7 @@ func (logger *Writer) Err(message string) error {
 func (logger *Writer) Warning(message string) error {
 	if logger.initialized {
 		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.WARN {
-			return logger.sysLogger.Warning(message)
+			return logger.SysLogger.Warning(message)
 		} else if logger.nullLogger != nil {
 			logger.nullLogger.Println(message)
 		}
@@ -223,7 +235,7 @@ func (logger *Writer) Warning(message string) error {
 func (logger *Writer) Alert(message string) error {
 	if logger.initialized {
 		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.ALERT {
-			return logger.sysLogger.Alert(message)
+			return logger.SysLogger.Alert(message)
 		} else if logger.nullLogger != nil {
 			logger.nullLogger.Println(message)
 		}
@@ -234,7 +246,7 @@ func (logger *Writer) Alert(message string) error {
 func (logger *Writer) Emerg(message string) error {
 	if logger.initialized {
 		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.EMERG {
-			return logger.sysLogger.Emerg(message)
+			return logger.SysLogger.Emerg(message)
 		} else if logger.nullLogger != nil {
 			logger.nullLogger.Println(message)
 		}
@@ -245,7 +257,7 @@ func (logger *Writer) Emerg(message string) error {
 func (logger *Writer) Notice(message string) error {
 	if logger.initialized {
 		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.NOTICE {
-			return logger.sysLogger.Notice(message)
+			return logger.SysLogger.Notice(message)
 		} else if logger.nullLogger != nil {
 			logger.nullLogger.Println(message)
 		}
@@ -256,7 +268,7 @@ func (logger *Writer) Notice(message string) error {
 func (logger *Writer) Info(message string) error {
 	if logger.initialized {
 		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.INFO {
-			return logger.sysLogger.Info(message)
+			return logger.SysLogger.Info(message)
 		} else if logger.nullLogger != nil {
 			logger.nullLogger.Println(message)
 		}
@@ -267,7 +279,7 @@ func (logger *Writer) Info(message string) error {
 func (logger *Writer) Println(message string) error {
 	if logger.initialized {
 		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.INFO {
-			return logger.sysLogger.Info(message)
+			return logger.SysLogger.Info(message)
 		} else if logger.nullLogger != nil {
 			logger.nullLogger.Println(message)
 		}
@@ -278,7 +290,7 @@ func (logger *Writer) Println(message string) error {
 func (logger *Writer) Debug(message string) error {
 	if logger.initialized {
 		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.DEBUG {
-			return logger.sysLogger.Debug(message)
+			return logger.SysLogger.Debug(message)
 		} else if logger.nullLogger != nil {
 			logger.nullLogger.Println(message)
 		}
@@ -289,7 +301,7 @@ func (logger *Writer) Debug(message string) error {
 func (logger *Writer) Write(message string) (int, error) {
 	if logger.initialized {
 		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.TRACE {
-			n, err := logger.sysLogger.Write([]byte(message))
+			n, err := logger.SysLogger.Write([]byte(message))
 			return n, err
 		} else if logger.nullLogger != nil {
 			logger.nullLogger.Println(message)
@@ -301,7 +313,7 @@ func (logger *Writer) Write(message string) (int, error) {
 func (logger *Writer) Close() error {
 	var err error
 	if logger.initialized {
-		err = logger.sysLogger.Close()
+		err = logger.SysLogger.Close()
 	}
 	logger = nil
 	return err
