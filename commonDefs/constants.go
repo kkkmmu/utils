@@ -33,6 +33,7 @@ const (
 	IfTypeLoopback
 	IfTypeSecondary
 	IfTypeVirtual
+	IfTypeVtep
 	IfTypeNull
 )
 
@@ -44,6 +45,8 @@ func GetIfTypeName(ifType int) string {
 		return "Lag"
 	case IfTypeVlan:
 		return "Vlan"
+	case IfTypeVtep:
+		return "Vtep"
 	default:
 		return "Unknown"
 	}
