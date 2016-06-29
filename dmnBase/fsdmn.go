@@ -27,7 +27,6 @@ import (
 	"asicd/asicdCommonDefs"
 	"asicdServices"
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"git.apache.org/thrift.git/lib/go/thrift"
@@ -59,11 +58,12 @@ type AsicdClient struct {
 }
 
 type FSBaseDmn struct {
-	DmnName   string
-	ParamsDir string
-	LogPrefix string
-	Logger    *logging.Writer
-	DbHdl     *dbutils.DBUtil
+	DmnName     string
+	ParamsDir   string
+	LogPrefix   string
+	Logger      *logging.Writer
+	DbHdl       *dbutils.DBUtil
+	ClientsList []ClientJson
 }
 
 type FSDaemon struct {
@@ -105,7 +105,18 @@ func (dmn *FSBaseDmn) Init() bool {
 	if err != nil {
 		return false
 	}
-	dmn.Logger.Info(fmt.Sprintln("Initializing base daemon"))
+	configFile := dmn.ParamsDir + "clients.json"
+	bytes, err := ioutil.ReadFile(configFile)
+	if err != nil {
+		dmn.Logger.Info(fmt.Sprintln("Error in reading configuration file ", configFile))
+		return false
+	}
+	err = json.Unmarshal(bytes, &dmn.ClientsList)
+	if err != nil {
+		dmn.Logger.Info("Error in Unmarshalling Json")
+		return false
+	}
+	dmn.Logger.Info("Base daemon init completed")
 	return true
 }
 
@@ -132,21 +143,8 @@ func NewBaseDmn(dmnName, logPrefix string) *FSBaseDmn {
 }
 
 func (dmn *FSDaemon) ConnectToAsicd() error {
-	configFile := dmn.ParamsDir + "clients.json"
-	var clientsList []ClientJson
-
-	bytes, err := ioutil.ReadFile(configFile)
-	if err != nil {
-		dmn.Logger.Info(fmt.Sprintln("Error in reading configuration file ", configFile))
-		return errors.New(fmt.Sprintln("Error in reading config file: ", configFile))
-	}
-	err = json.Unmarshal(bytes, &clientsList)
-	if err != nil {
-		dmn.Logger.Info("Error in Unmarshalling Json")
-		return errors.New("Error unmarshaling")
-	}
-
-	for _, client := range clientsList {
+	var err error
+	for _, client := range dmn.FSBaseDmn.ClientsList {
 		if client.Name == "asicd" {
 			dmn.Logger.Info(fmt.Sprintln("found  asicd at port ", client.Port))
 			dmn.Asicdclnt.Address = "localhost:" + strconv.Itoa(client.Port)

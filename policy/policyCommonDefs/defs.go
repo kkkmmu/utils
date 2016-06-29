@@ -13,24 +13,27 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package policyCommonDefs
 
 const (
 	PolicyConditionTypeDstIpPrefixMatch       = 0
 	PolicyConditionTypeProtocolMatch          = 1
+	PolicyConditionTypeNeighborMatch          = 2
 	PolicyActionTypeRouteDisposition          = 0
 	PolicyActionTypeRouteRedistribute         = 1
 	PoilcyActionTypeSetAdminDistance          = 2
 	PolicyActionTypeNetworkStatementAdvertise = 3
 	PolicyActionTypeAggregate                 = 4
+	PolicyActionTypeRIBIn                     = 5
+	PolicyActionTypeRIBOut                    = 6
 	PolicyPath_Import                         = 1
 	PolicyPath_Export                         = 2
 	PolicyPath_All                            = 3

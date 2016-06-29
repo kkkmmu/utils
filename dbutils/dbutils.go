@@ -53,6 +53,21 @@ type DBUtil struct {
 	address string
 }
 
+type DBIntf interface {
+	Connect() error
+	Disconnect()
+	StoreObjectInDb(objects.ConfigObj) error
+	DeleteObjectFromDb(objects.ConfigObj) error
+	GetObjectFromDb(objects.ConfigObj, string) (objects.ConfigObj, error)
+	GetKey(objects.ConfigObj) string
+	GetAllObjFromDb(objects.ConfigObj) ([]objects.ConfigObj, error)
+	CompareObjectsAndDiff(objects.ConfigObj, map[string]bool, objects.ConfigObj)
+	UpdateObjectInDb(objects.ConfigObj, objects.ConfigObj, []bool)
+	MergeDbAndConfigObj(objects.ConfigObj, objects.ConfigObj, []bool) (objects.ConfigObj, error)
+	GetBulkObjFromDb(obj objects.ConfigObj, startIndex, count int64) (error, int64, int64, bool, []objects.ConfigObj)
+	Publish(string, interface{}, interface{})
+}
+
 func NewDBUtil(logger *logging.Writer) *DBUtil {
 	return &DBUtil{
 		logger:  logger,
@@ -150,4 +165,10 @@ func (db *DBUtil) GetBulkObjFromDb(obj objects.ConfigObj, startIndex, count int6
 		return DBNotConnectedError{db.network, db.address}, 0, 0, false, make([]objects.ConfigObj, 0)
 	}
 	return obj.GetBulkObjFromDb(startIndex, count, db.Conn)
+}
+
+func (db *DBUtil) Publish(op string, channel interface{}, msg interface{}) {
+	if db.Conn != nil {
+		db.Do(op, channel, msg)
+	}
 }
