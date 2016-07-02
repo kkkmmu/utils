@@ -66,6 +66,7 @@ type DBIntf interface {
 	MergeDbAndConfigObj(objects.ConfigObj, objects.ConfigObj, []bool) (objects.ConfigObj, error)
 	GetBulkObjFromDb(obj objects.ConfigObj, startIndex, count int64) (error, int64, int64, bool, []objects.ConfigObj)
 	Publish(string, interface{}, interface{})
+	StoreEventsInDb(string, string) error
 }
 
 func NewDBUtil(logger *logging.Writer) *DBUtil {
@@ -171,4 +172,14 @@ func (db *DBUtil) Publish(op string, channel interface{}, msg interface{}) {
 	if db.Conn != nil {
 		db.Do(op, channel, msg)
 	}
+}
+
+func (db *DBUtil) StoreEventsInDb(eventKey string, val string) error {
+	if db.Conn != nil {
+		_, err := db.Do("HMSET", eventKey, "Desc", val)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

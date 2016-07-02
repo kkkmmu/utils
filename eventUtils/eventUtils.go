@@ -85,6 +85,7 @@ type EventJson struct {
 
 type PubIntf interface {
 	Publish(string, interface{}, interface{})
+	StoreEventsInDb(string, string) error
 }
 
 var GlobalEventEnable bool = true
@@ -176,7 +177,13 @@ func PublishEvents(eventId events.EventId, key interface{}) error {
 	evt.Description = evtEnt.Description
 	evt.SrcObjName = evtEnt.SrcObjName
 	evt.SrcObjKey = key
-	Logger.Info(fmt.Sprintln("Events to be published: ", evt))
+	Logger.Debug(fmt.Sprintln("Events to be published: ", evt))
+	keyStr := fmt.Sprintf("Events#%s#%s#%s#%s#", evt.OwnerName, evt.SrcObjName, evt.SrcObjKey, evt.TimeStamp.String())
+	Logger.Debug(fmt.Sprintln("Key Str :", keyStr))
+	err := PubHdl.StoreEventsInDb(keyStr, evt.Description)
+	if err != nil {
+		Logger.Err(fmt.Sprintln("Storing Events in database failed, err:", err))
+	}
 	msg, _ := json.Marshal(*evt)
 	PubHdl.Publish("PUBLISH", evt.OwnerName, msg)
 	return nil
