@@ -31,12 +31,13 @@ import (
 	"io/ioutil"
 	"models/events"
 	"net/http"
+	"sort"
+	"strconv"
+	"strings"
 	"time"
+	"utils/commonDefs"
 	"utils/logging"
-)
-
-const (
-	MAX_JSON_LENGTH = 4096
+	"utils/typeConv"
 )
 
 type Event struct {
@@ -91,8 +92,17 @@ type EventJson struct {
 
 type PubIntf interface {
 	Publish(string, interface{}, interface{})
-	StoreEventsInDb(string, string) error
+	StoreValInDb(interface{}, interface{}, interface{}) error
+	GetAllKeys(interface{}) (interface{}, error)
+	GetValFromDB(key interface{}, field interface{}) (interface{}, error)
 }
+
+type KeyObj struct {
+	Key   string
+	UTime int64
+}
+
+type KeyObjSlice []KeyObj
 
 var GlobalEventEnable bool = true
 var OwnerName string
@@ -184,9 +194,9 @@ func PublishEvents(eventId events.EventId, key interface{}) error {
 	evt.SrcObjName = evtEnt.SrcObjName
 	evt.SrcObjKey = key
 	Logger.Debug(fmt.Sprintln("Events to be published: ", evt))
-	keyStr := fmt.Sprintf("Events#%s#%s#%s#%s#", evt.OwnerName, evt.SrcObjName, evt.SrcObjKey, evt.TimeStamp.String())
+	keyStr := fmt.Sprintf("Events#%s#%s#%s#%s#%s#%d#", evt.OwnerName, evt.EventName, evt.SrcObjName, evt.SrcObjKey, evt.TimeStamp.String(), evt.TimeStamp.UnixNano())
 	Logger.Debug(fmt.Sprintln("Key Str :", keyStr))
-	err := PubHdl.StoreEventsInDb(keyStr, evt.Description)
+	err := PubHdl.StoreValInDb(keyStr, evt.Description, "Desc")
 	if err != nil {
 		Logger.Err(fmt.Sprintln("Storing Events in database failed, err:", err))
 	}
@@ -198,7 +208,7 @@ func PublishEvents(eventId events.EventId, key interface{}) error {
 func GetEventQueryParams(r *http.Request) (evtObj events.EventObject, err error) {
 	var body []byte
 	if r != nil {
-		body, err = ioutil.ReadAll(io.LimitReader(r.Body, MAX_JSON_LENGTH))
+		body, err = ioutil.ReadAll(io.LimitReader(r.Body, commonDefs.MAX_JSON_LENGTH))
 		if err != nil {
 			return evtObj, err
 		}
@@ -207,24 +217,100 @@ func GetEventQueryParams(r *http.Request) (evtObj events.EventObject, err error)
 		}
 	}
 
+	if len(body) == 0 {
+		return evtObj, err
+	}
 	err = json.Unmarshal(body, &evtObj)
 	if err != nil {
-		fmt.Println("UnmarshalObject returnexd error", err, "for ojbect info", evtObj)
+		fmt.Println("UnmarshalObject returned error", err, "for ojbect info", evtObj)
 	}
 	return evtObj, err
 }
 
 func GetEvents(evtQueryObj events.EventObject, pubHdl PubIntf, logger logging.LoggerIntf) (evt []events.EventObject, err error) {
-	fmt.Println("Event Query Object:", evtQueryObj)
-	obj := events.EventObject{
-		OwnerName:   "ASICD",
-		EventName:   "PortStateUp",
-		TimeStamp:   time.Now().String(),
-		Description: "Front Panel Port Went UP",
-		SrcObjName:  "Port",
-		SrcObjKey:   "{IntfRef:fpPort1}",
+	qPattern := constructQueryPattern(evtQueryObj)
+	fmt.Println("Pattern Query:", qPattern)
+	keys, err := typeConv.ConvertToStrings(pubHdl.GetAllKeys(qPattern))
+	if err != nil {
+		logger.Err(fmt.Sprintln("Error querying for keys:", err))
 	}
-
-	evt = append(evt, obj)
+	keySlice := constructKeySlice(keys)
+	if keySlice == nil {
+		logger.Err("Key slice is nil")
+	}
+	sort.Sort(KeyObjSlice(keySlice))
+	for _, keyObj := range keySlice {
+		desc, err := typeConv.ConvertToString(pubHdl.GetValFromDB(keyObj.Key, "Desc"))
+		if err != nil {
+			logger.Err(fmt.Sprintln("Error getting the value from DB", err))
+			continue
+		}
+		str := strings.Split(keyObj.Key, "#")
+		obj := events.EventObject{
+			OwnerName:   str[1],
+			EventName:   str[2],
+			TimeStamp:   str[5],
+			Description: desc,
+			SrcObjName:  str[3],
+			SrcObjKey:   str[4],
+		}
+		evt = append(evt, obj)
+	}
 	return evt, err
+}
+
+func constructQueryPattern(evtQueryObj events.EventObject) string {
+	pattern := "Events#"
+	if evtQueryObj.OwnerName == "" {
+		pattern = pattern + "*#"
+	} else {
+		pattern = pattern + strings.ToUpper(evtQueryObj.OwnerName) + "#"
+	}
+	if evtQueryObj.EventName == "" {
+		pattern = pattern + "*#"
+	} else {
+		pattern = pattern + evtQueryObj.EventName + "#"
+	}
+	if evtQueryObj.SrcObjName == "" {
+		pattern = pattern + "*#"
+	} else {
+		pattern = pattern + evtQueryObj.SrcObjName + "#"
+	}
+	if evtQueryObj.SrcObjKey == "" {
+		pattern = pattern + "*#"
+	} else {
+		pattern = pattern + evtQueryObj.SrcObjKey + "#"
+	}
+	pattern = pattern + "*"
+	return pattern
+}
+
+func constructKeySlice(keys []string) []KeyObj {
+	var kObjSlice []KeyObj
+	for _, key := range keys {
+		str := strings.Split(key, "#")
+		uTime, err := strconv.ParseInt(str[len(str)-2], 10, 64)
+		if err != nil {
+			fmt.Println("Unable to Parse Int64")
+			continue
+		}
+		kObj := KeyObj{
+			Key:   key,
+			UTime: uTime,
+		}
+		kObjSlice = append(kObjSlice, kObj)
+	}
+	return kObjSlice
+}
+
+func (kObjSlice KeyObjSlice) Less(i, j int) bool {
+	return kObjSlice[i].UTime > kObjSlice[j].UTime
+}
+
+func (kObjSlice KeyObjSlice) Swap(i, j int) {
+	kObjSlice[i], kObjSlice[j] = kObjSlice[j], kObjSlice[i]
+}
+
+func (kObjSlice KeyObjSlice) Len() int {
+	return len(kObjSlice)
 }
