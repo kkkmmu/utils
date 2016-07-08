@@ -27,10 +27,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"models/events"
+	"net/http"
 	"time"
 	"utils/logging"
+)
+
+const (
+	MAX_JSON_LENGTH = 4096
 )
 
 type Event struct {
@@ -187,4 +193,38 @@ func PublishEvents(eventId events.EventId, key interface{}) error {
 	msg, _ := json.Marshal(*evt)
 	PubHdl.Publish("PUBLISH", evt.OwnerName, msg)
 	return nil
+}
+
+func GetEventQueryParams(r *http.Request) (evtObj events.EventObject, err error) {
+	var body []byte
+	if r != nil {
+		body, err = ioutil.ReadAll(io.LimitReader(r.Body, MAX_JSON_LENGTH))
+		if err != nil {
+			return evtObj, err
+		}
+		if err = r.Body.Close(); err != nil {
+			return evtObj, err
+		}
+	}
+
+	err = json.Unmarshal(body, &evtObj)
+	if err != nil {
+		fmt.Println("UnmarshalObject returnexd error", err, "for ojbect info", evtObj)
+	}
+	return evtObj, err
+}
+
+func GetEvents(evtQueryObj events.EventObject, pubHdl PubIntf, logger logging.LoggerIntf) (evt []events.EventObject, err error) {
+	fmt.Println("Event Query Object:", evtQueryObj)
+	obj := events.EventObject{
+		OwnerName:   "ASICD",
+		EventName:   "PortStateUp",
+		TimeStamp:   time.Now().String(),
+		Description: "Front Panel Port Went UP",
+		SrcObjName:  "Port",
+		SrcObjKey:   "{IntfRef:fpPort1}",
+	}
+
+	evt = append(evt, obj)
+	return evt, err
 }
