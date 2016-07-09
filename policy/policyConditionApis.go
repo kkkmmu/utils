@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 // PolicyConditionApis.go
 package policy
@@ -58,6 +58,7 @@ type PolicyConditionConfig struct {
 	ConditionType                 string
 	MatchProtocolConditionInfo    string
 	MatchDstIpPrefixConditionInfo PolicyDstIpMatchPrefixSetCondition
+	MatchNeighborConditionInfo    string
 	//MatchNeighborConditionInfo   PolicyMatchNeighborSetCondition
 	//MatchTagConditionInfo   PolicyMatchTagSetCondition
 }
@@ -164,6 +165,32 @@ func (db *PolicyEngineDB) CreatePolicyMatchProtocolCondition(cfg PolicyCondition
 	}
 	return true, err
 }
+
+func (db *PolicyEngineDB) CreatePolicyMatchNeighborCondition(cfg PolicyConditionConfig) (val bool, err error) {
+	db.Logger.Info(fmt.Sprintln("CreatePolicyMatchNeighborCondition"))
+
+	policyCondition := db.PolicyConditionsDB.Get(patriciaDB.Prefix(cfg.Name))
+	if policyCondition == nil {
+		db.Logger.Info(fmt.Sprintln("Defining a new policy condition with name ", cfg.Name, " to match on neighbor ", cfg.MatchNeighborConditionInfo))
+		matchNeighbor := cfg.MatchNeighborConditionInfo
+		newPolicyCondition := PolicyCondition{Name: cfg.Name,
+			ConditionType: policyCommonDefs.PolicyConditionTypeNeighborMatch, ConditionInfo: matchNeighbor,
+			LocalDBSliceIdx: (len(*db.LocalPolicyConditionsDB))}
+		newPolicyCondition.ConditionGetBulkInfo = "match Neighbor " + matchNeighbor
+		if ok := db.PolicyConditionsDB.Insert(patriciaDB.Prefix(cfg.Name), newPolicyCondition); ok != true {
+			db.Logger.Info(fmt.Sprintln(" return value not ok"))
+			err = errors.New("Error creating condition in the DB")
+			return false, err
+		}
+		db.LocalPolicyConditionsDB.updateLocalDB(patriciaDB.Prefix(cfg.Name), add)
+	} else {
+		db.Logger.Err(fmt.Sprintln("Duplicate Condition name"))
+		err = errors.New("Duplicate policy condition definition")
+		return false, err
+	}
+	return true, err
+}
+
 func (db *PolicyEngineDB) ValidateConditionConfigCreate(inCfg PolicyConditionConfig) (err error) {
 	db.Logger.Info(fmt.Sprintln("ValidateConditionConfigCreate"))
 	policyCondition := db.PolicyConditionsDB.Get(patriciaDB.Prefix(inCfg.Name))
@@ -174,44 +201,46 @@ func (db *PolicyEngineDB) ValidateConditionConfigCreate(inCfg PolicyConditionCon
 	}
 	switch inCfg.ConditionType {
 	case "MatchProtocol":
-	   break
+		break
 	case "MatchDstIpPrefix":
-	    cfg := inCfg.MatchDstIpPrefixConditionInfo
-	    if len(cfg.PrefixSet) == 0 && len(cfg.Prefix.IpPrefix) == 0 {
-		    db.Logger.Err(fmt.Sprintln("Empty prefix set/nil prefix"))
-		    err = errors.New("Empty prefix set/nil prefix")
-		    return err
-	    }
-	    if len(cfg.PrefixSet) != 0 && len(cfg.Prefix.IpPrefix) != 0 {
-		    db.Logger.Err(fmt.Sprintln("Cannot provide both prefix set and individual prefix"))
-		    err = errors.New("Cannot provide both prefix set and individual prefix")
-		    return err
-	    }
-	    if len(cfg.Prefix.IpPrefix) != 0 {
-		_, err = netUtils.GetNetworkPrefixFromCIDR(cfg.Prefix.IpPrefix)
-		if err != nil {
-			db.Logger.Err(fmt.Sprintln("ipPrefix invalid "))
-			return errors.New("ipPrefix invalid") 
+		cfg := inCfg.MatchDstIpPrefixConditionInfo
+		if len(cfg.PrefixSet) == 0 && len(cfg.Prefix.IpPrefix) == 0 {
+			db.Logger.Err(fmt.Sprintln("Empty prefix set/nil prefix"))
+			err = errors.New("Empty prefix set/nil prefix")
+			return err
 		}
-		if cfg.Prefix.MasklengthRange == "exact" {
-		} else {
-			maskList := strings.Split(cfg.Prefix.MasklengthRange, "-")
-			if len(maskList) != 2 {
-				db.Logger.Err(fmt.Sprintln("Invalid masklength range"))
-				return errors.New("Invalid masklength range")
-			}
-			_, err = strconv.Atoi(maskList[0])
+		if len(cfg.PrefixSet) != 0 && len(cfg.Prefix.IpPrefix) != 0 {
+			db.Logger.Err(fmt.Sprintln("Cannot provide both prefix set and individual prefix"))
+			err = errors.New("Cannot provide both prefix set and individual prefix")
+			return err
+		}
+		if len(cfg.Prefix.IpPrefix) != 0 {
+			_, err = netUtils.GetNetworkPrefixFromCIDR(cfg.Prefix.IpPrefix)
 			if err != nil {
-				db.Logger.Err(fmt.Sprintln("lowRange mask not valid"))
-				return errors.New("lowRange mask not valid")
+				db.Logger.Err(fmt.Sprintln("ipPrefix invalid "))
+				return errors.New("ipPrefix invalid")
 			}
-			_, err = strconv.Atoi(maskList[1])
-			if err != nil {
-				db.Logger.Err(fmt.Sprintln("highRange mask not valid"))
-				return errors.New("highRange mask not valid")
+			if cfg.Prefix.MasklengthRange == "exact" {
+			} else {
+				maskList := strings.Split(cfg.Prefix.MasklengthRange, "-")
+				if len(maskList) != 2 {
+					db.Logger.Err(fmt.Sprintln("Invalid masklength range"))
+					return errors.New("Invalid masklength range")
+				}
+				_, err = strconv.Atoi(maskList[0])
+				if err != nil {
+					db.Logger.Err(fmt.Sprintln("lowRange mask not valid"))
+					return errors.New("lowRange mask not valid")
+				}
+				_, err = strconv.Atoi(maskList[1])
+				if err != nil {
+					db.Logger.Err(fmt.Sprintln("highRange mask not valid"))
+					return errors.New("highRange mask not valid")
+				}
 			}
 		}
-	}		
+	case "MatchNeighbor":
+		break
 	default:
 		db.Logger.Err(fmt.Sprintln("Unknown condition type ", inCfg.ConditionType))
 		err = errors.New("Unknown condition type")
@@ -228,6 +257,10 @@ func (db *PolicyEngineDB) CreatePolicyCondition(cfg PolicyConditionConfig) (val 
 	case "MatchProtocol":
 		val, err = db.CreatePolicyMatchProtocolCondition(cfg)
 		break
+	case "MatchNeighbor":
+		val, err = db.CreatePolicyMatchNeighborCondition(cfg)
+		break
+
 	default:
 		db.Logger.Err(fmt.Sprintln("Unknown condition type ", cfg.ConditionType))
 		err = errors.New("Unknown condition type")
@@ -240,7 +273,7 @@ func (db *PolicyEngineDB) ValidateConditionConfigDelete(cfg PolicyConditionConfi
 	if conditionItem == nil {
 		db.Logger.Err(fmt.Sprintln("Condition ", cfg.Name, "not found in the DB"))
 		err = errors.New("Condition not found")
-		return  err
+		return err
 	}
 	condition := conditionItem.(PolicyCondition)
 	if len(condition.PolicyStmtList) != 0 {

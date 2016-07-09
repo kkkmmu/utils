@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 // ribdPolicyActionApis.go
 package policy
@@ -191,6 +191,51 @@ func (db *PolicyEngineDB) CreatePolicyAggregateAction(cfg PolicyActionConfig) (v
 	return true, err
 }
 
+func (db *PolicyEngineDB) CreatePolicyRIBInOutAction(cfg PolicyActionConfig) (val bool, err error) {
+	db.Logger.Info(fmt.Sprintln("CreatePolicyRIBInAction"))
+
+	var actionType int
+	switch cfg.ActionType {
+	case "RIBIn":
+		actionType = policyCommonDefs.PolicyActionTypeRIBIn
+	case "RIBOut":
+		actionType = policyCommonDefs.PolicyActionTypeRIBOut
+	default:
+		db.Logger.Err(fmt.Sprintln("Unknown action type ", cfg.ActionType))
+		err = errors.New("Unknown action type")
+		return false, err
+	}
+
+	policyAction := db.PolicyActionsDB.Get(patriciaDB.Prefix(cfg.Name))
+	if policyAction == nil {
+		db.Logger.Info(fmt.Sprintln("Defining a new policy action with name ", cfg.Name))
+		ribInOutAction := ""
+		if cfg.Accept == true {
+			ribInOutAction = "permit"
+		} else if cfg.Reject == true {
+			ribInOutAction = "deny"
+		} else {
+			db.Logger.Err(fmt.Sprintln("User should set either one of permit/deny to true for this action type"))
+			err = errors.New("User should set either one of permit/deny to true for this action type")
+			return false, err
+		}
+		newPolicyAction := PolicyAction{Name: cfg.Name, ActionType: actionType, ActionInfo: ribInOutAction,
+			LocalDBSliceIdx: (len(*db.LocalPolicyActionsDB))}
+		newPolicyAction.ActionGetBulkInfo = ribInOutAction
+		if ok := db.PolicyActionsDB.Insert(patriciaDB.Prefix(cfg.Name), newPolicyAction); ok != true {
+			db.Logger.Err(fmt.Sprintln(" return value not ok"))
+			err = errors.New("Error inserting action in DB")
+			return false, err
+		}
+		db.LocalPolicyActionsDB.updateLocalDB(patriciaDB.Prefix(cfg.Name), add)
+	} else {
+		db.Logger.Err(fmt.Sprintln("Duplicate action name"))
+		err = errors.New("Duplicate policy action definition")
+		return false, err
+	}
+	return true, err
+}
+
 func (db *PolicyEngineDB) CreatePolicyAction(cfg PolicyActionConfig) (val bool, err error) {
 	db.Logger.Info(fmt.Sprintln("CreatePolicyAction"))
 	switch cfg.ActionType {
@@ -208,6 +253,12 @@ func (db *PolicyEngineDB) CreatePolicyAction(cfg PolicyActionConfig) (val bool, 
 		break
 	case "Aggregate":
 		val, err = db.CreatePolicyAggregateAction(cfg)
+		break
+	case "RIBIn":
+		val, err = db.CreatePolicyRIBInOutAction(cfg)
+		break
+	case "RIBOut":
+		val, err = db.CreatePolicyRIBInOutAction(cfg)
 		break
 	default:
 		db.Logger.Err(fmt.Sprintln("Unknown action type ", cfg.ActionType))
