@@ -42,7 +42,22 @@ func (asicdClientMgr *OvsAsicdClientMgr) UpdateIPv4Neighbor(ipAddr, macAddr stri
 	return 0, nil
 }
 
+func (asicdClientMgr *OvsAsicdClientMgr) CreateIPv6Neighbor(ipAddr, macAddr string, vlanId, ifIdx int32) (int32, error) {
+	fmt.Println(ipAddr, macAddr, vlanId, ifIdx, asicdClientMgr.Val)
+	return 0, nil
+}
+
+func (asicdClientMgr *OvsAsicdClientMgr) UpdateIPv6Neighbor(ipAddr, macAddr string, vlanId, ifIdx int32) (int32, error) {
+	fmt.Println(ipAddr, macAddr, vlanId, ifIdx, asicdClientMgr.Val)
+	return 0, nil
+}
+
 func (asicdClientMgr *OvsAsicdClientMgr) DeleteIPv4Neighbor(ipAddr string) (int32, error) {
+	fmt.Println(ipAddr, asicdClientMgr.Val)
+	return 0, nil
+}
+
+func (asicdClientMgr *OvsAsicdClientMgr) DeleteIPv6Neighbor(ipAddr string) (int32, error) {
 	fmt.Println(ipAddr, asicdClientMgr.Val)
 	return 0, nil
 }
@@ -77,6 +92,59 @@ func (asicdClientMgr *OvsAsicdClientMgr) GetAllIPv4IntfState() ([]*commonDefs.IP
 	return nil, nil
 }
 
+func (asicdClientMgr *OvsAsicdClientMgr) GetAllIPv6IntfState() ([]*commonDefs.IPv6IntfState, error) {
+	fmt.Println("Get all IPv6 Intf State called")
+	return nil, nil
+}
+
+func (asicdClientMgr *OvsAsicdClientMgr) GetAllPortState() ([]*commonDefs.PortState, error) {
+	fmt.Println("Get all Port Intf State called")
+	return nil, nil
+}
+
+func (asicdClientMgr *OvsAsicdClientMgr) GetAllVlanState() ([]*commonDefs.VlanState, error) {
+	fmt.Println("Get all Vlan State called")
+	return nil, nil
+}
+
+func (asicdClientMgr *OvsAsicdClientMgr) GetAllVlan() ([]*commonDefs.Vlan, error) {
+	fmt.Println("Get all Vlan called")
+	return nil, nil
+}
+
+func (asicdClientMgr *OvsAsicdClientMgr) GetPort(name string) (*commonDefs.Port, error) {
+	fmt.Println("Get Port Intf State called")
+	return nil, nil
+}
+
 func (asicdClientMgr *OvsAsicdClientMgr) DetermineRouterId() string {
 	return "0.0.0.0"
+}
+
+func (asicdClientMgr *OvsAsicdClientMgr) GetPortLinkStatus(pId int32) bool {
+	return true
+}
+
+func (asicdClientMgr *OvsAsicdClientMgr) CreateStgBridge(vlanList []uint16) int32 {
+	return -1
+}
+
+func (asicdClientMgr *OvsAsicdClientMgr) DeleteStgBridge(stgid int32, vlanList []uint16) error {
+	return nil
+}
+
+func (asicdClientMgr *OvsAsicdClientMgr) SetStgPortState(stgid int32, ifindex int32, state int) error {
+	return nil
+}
+
+func (asicdClientMgr *OvsAsicdClientMgr) FlushStgFdb(stgid int32) error {
+	return nil
+}
+
+func (asicdClientMgr *OvsAsicdClientMgr) BPDUGuardDetected(ifindex int32, enable bool) error {
+	return nil
+}
+
+func (asicdClientMgr *OvsAsicdClientMgr) GetSwitchMAC(paramsPath string) string {
+	return "00:00:00:00:00:00"
 }

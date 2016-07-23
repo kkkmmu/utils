@@ -24,14 +24,14 @@
 package dmnBase
 
 import (
-	"fmt"
-	"io/ioutil"
-	"time"
+	"arpd"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io/ioutil"
 	"strconv"
+	"time"
 	"utils/ipcutils"
-	"arpd"
 )
 
 type ArpdClient struct {
@@ -66,14 +66,16 @@ func (dmn *L2Daemon) ConnectToArpd() error {
 			dmn.Arpdclnt.Transport, dmn.Arpdclnt.PtrProtocolFactory, _ = ipcutils.CreateIPCHandles(dmn.Arpdclnt.Address)
 			if dmn.Arpdclnt.Transport != nil && dmn.Arpdclnt.PtrProtocolFactory != nil {
 				dmn.Logger.Info(fmt.Sprintln("connecting to arpd,asicdclnt.IsConnected:", dmn.Arpdclnt.IsConnected))
-				dmn.Arpdclnt.ClientHdl = arpd.NewARPDServicesClientFactory(dmn.Arpdclnt.Transport, dmn.Arpdclnt.PtrProtocolFactory)
+				dmn.Arpdclnt.ClientHdl =
+					arpd.NewARPDServicesClientFactory(dmn.Arpdclnt.Transport, dmn.Arpdclnt.PtrProtocolFactory)
 				dmn.Arpdclnt.IsConnected = true
 			} else {
 				dmn.Logger.Info(fmt.Sprintf("Failed to connect to Asicd, retrying until connection is successful"))
 				count := 0
 				ticker := time.NewTicker(time.Duration(1000) * time.Millisecond)
 				for _ = range ticker.C {
-					dmn.Arpdclnt.Transport, dmn.Arpdclnt.PtrProtocolFactory, err = ipcutils.CreateIPCHandles(dmn.Arpdclnt.Address)
+					dmn.Arpdclnt.Transport, dmn.Arpdclnt.PtrProtocolFactory, err =
+						ipcutils.CreateIPCHandles(dmn.Arpdclnt.Address)
 					if err == nil {
 						ticker.Stop()
 						break
@@ -101,7 +103,7 @@ func (dmn *L2Daemon) Init(dmnName string, logPrefix string) bool {
 	}
 	return true
 }
-func (dmn *L2Daemon) ConnectToServers () error {
+func (dmn *L2Daemon) ConnectToServers() error {
 	err := dmn.FSDaemon.ConnectToServers()
 	if err != nil {
 		dmn.Logger.Err("Failed to connect to server")

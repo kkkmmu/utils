@@ -104,11 +104,18 @@ type KeyObj struct {
 
 type KeyObjSlice []KeyObj
 
+type RecvdEvent struct {
+	eventId        events.EventId
+	key            interface{}
+	additionalInfo string
+}
+
 var GlobalEventEnable bool = true
 var OwnerName string
 var OwnerId events.OwnerId
 var Logger logging.LoggerIntf
 var PubHdl PubIntf
+var PublishCh chan RecvdEvent
 
 const (
 	EventDir string = "/etc/flexswitch/"
@@ -156,8 +163,7 @@ func initEventDetails(ownerName string) error {
 	return nil
 }
 
-func InitEvents(ownerName string, pubHdl PubIntf, logger logging.LoggerIntf) error {
-
+func InitEvents(ownerName string, pubHdl PubIntf, logger logging.LoggerIntf, evtChBufSize int32) error {
 	EventMap = make(map[events.EventId]EventDetails)
 	Logger = logger
 	PubHdl = pubHdl
@@ -166,12 +172,34 @@ func InitEvents(ownerName string, pubHdl PubIntf, logger logging.LoggerIntf) err
 	if err != nil {
 		return err
 	}
-
+	PublishCh = make(chan RecvdEvent, evtChBufSize)
+	go eventHandler()
 	Logger.Info(fmt.Sprintln("EventMap:", EventMap))
 	return nil
 }
 
-func PublishEvents(eventId events.EventId, key interface{}) error {
+func eventHandler() {
+	for {
+		recvdEvt := <-PublishCh
+		err := publishRecvdEvents(recvdEvt.eventId, recvdEvt.key, recvdEvt.additionalInfo)
+		if err != nil {
+			Logger.Err(fmt.Sprintln("Error Publishing Events:", err))
+		}
+	}
+}
+
+func PublishEvents(eventId events.EventId, key interface{}, additionalInfo string) error {
+	recvdEvt := RecvdEvent{
+		eventId:        eventId,
+		key:            key,
+		additionalInfo: additionalInfo,
+	}
+	PublishCh <- recvdEvt
+	return nil
+}
+
+func publishRecvdEvents(eventId events.EventId, key interface{}, additionalInfo string) error {
+	var err error
 	if GlobalEventEnable == false {
 		return nil
 	}
@@ -190,17 +218,30 @@ func PublishEvents(eventId events.EventId, key interface{}) error {
 	evt.EvtId = eventId
 	evt.EventName = evtEnt.EventName
 	evt.TimeStamp = time.Now()
-	evt.Description = evtEnt.Description
+	if additionalInfo != "" {
+		evt.Description = evtEnt.Description + ": " + additionalInfo
+	} else {
+		evt.Description = evtEnt.Description
+	}
 	evt.SrcObjName = evtEnt.SrcObjName
 	evt.SrcObjKey = key
-	Logger.Debug(fmt.Sprintln("Events to be published: ", evt))
-	keyStr := fmt.Sprintf("Events#%s#%s#%s#%s#%s#%d#", evt.OwnerName, evt.EventName, evt.SrcObjName, evt.SrcObjKey, evt.TimeStamp.String(), evt.TimeStamp.UnixNano())
+	msg, _ := json.Marshal(*evt)
+	var unmarshalMsg events.Event
+	err = json.Unmarshal(msg, &unmarshalMsg)
+	keyMap, _ := events.EventKeyMap[evt.OwnerName]
+	obj, _ := keyMap[evt.SrcObjName]
+	obj = unmarshalMsg.SrcObjKey
+	str := fmt.Sprintf("%v", obj)
+	keyString := strings.TrimPrefix(str, "map[")
+	strKey := strings.Split(keyString, "]")
+	Logger.Info(fmt.Sprintln("Events to be published: ", evt, strKey[0]))
+	keyStr := fmt.Sprintf("Events#%s#%s#%s#%s#%s#%d#", evt.OwnerName, evt.EventName, evt.SrcObjName, strKey[0], evt.TimeStamp.String(), evt.TimeStamp.UnixNano())
 	Logger.Debug(fmt.Sprintln("Key Str :", keyStr))
-	err := PubHdl.StoreValInDb(keyStr, evt.Description, "Desc")
+
+	err = PubHdl.StoreValInDb(keyStr, evt.Description, "Desc")
 	if err != nil {
 		Logger.Err(fmt.Sprintln("Storing Events in database failed, err:", err))
 	}
-	msg, _ := json.Marshal(*evt)
 	PubHdl.Publish("PUBLISH", evt.OwnerName, msg)
 	return nil
 }

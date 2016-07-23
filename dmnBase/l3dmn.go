@@ -24,15 +24,15 @@
 package dmnBase
 
 import (
-	"fmt"
-	"io/ioutil"
-	"time"
 	"encoding/json"
 	"errors"
-	"strconv"
-	"utils/ipcutils"
-	"ribd"
+	"fmt"
 	nanomsg "github.com/op/go-nanomsg"
+	"io/ioutil"
+	"ribd"
+	"strconv"
+	"time"
+	"utils/ipcutils"
 )
 
 type RIBdClient struct {
@@ -42,10 +42,10 @@ type RIBdClient struct {
 
 type L3Daemon struct {
 	FSDaemon
-	Ribdclnt RIBdClient
-	RibdSubSocket         *nanomsg.SubSocket
-	RibdSubSocketCh       chan []byte
-	RibdSubSocketErrCh    chan error
+	Ribdclnt           RIBdClient
+	RibdSubSocket      *nanomsg.SubSocket
+	RibdSubSocketCh    chan []byte
+	RibdSubSocketErrCh chan error
 }
 
 func (dmn *L3Daemon) ConnectToRIBd() error {
@@ -141,10 +141,10 @@ func (dmn *L3Daemon) ListenForRIBdUpdates(address string) error {
 func (dmn *L3Daemon) InitSubscribers(ribdsubscriberList []string) (err error) {
 	dmn.Logger.Info("L3 Dmn InitSubscribers")
 	dmn.FSDaemon.InitSubscribers(nil)
-	for _,sub := range ribdsubscriberList {
-	    go dmn.CreateRIBdSubscriber(sub)
+	for _, sub := range ribdsubscriberList {
+		go dmn.CreateRIBdSubscriber(sub)
 	}
-	return err 
+	return err
 }
 func (dmn *L3Daemon) Init(dmnName string, logPrefix string) bool {
 	if !dmn.FSDaemon.Init(dmnName, logPrefix) {
@@ -154,7 +154,7 @@ func (dmn *L3Daemon) Init(dmnName string, logPrefix string) bool {
 	return true
 }
 
-func (dmn *L3Daemon) ConnectToServers () error {
+func (dmn *L3Daemon) ConnectToServers() error {
 	err := dmn.FSDaemon.ConnectToServers()
 	if err != nil {
 		dmn.Logger.Err("Failed to connect to servers")

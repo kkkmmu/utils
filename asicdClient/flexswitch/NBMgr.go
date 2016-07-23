@@ -47,7 +47,9 @@ var AsicdMsgMap map[uint8]processMsg = map[uint8]processMsg{
 	asicdCommonDefs.NOTIFY_LOGICAL_INTF_UPDATE:       processLogicalIntfNotifyMsg,
 	asicdCommonDefs.NOTIFY_IPV4INTF_CREATE:           processIPv4IntfNotifyMsg,
 	asicdCommonDefs.NOTIFY_IPV4INTF_DELETE:           processIPv4IntfNotifyMsg,
-	asicdCommonDefs.NOTIFY_LAG_CREATE:                processIPv4IntfNotifyMsg,
+	asicdCommonDefs.NOTIFY_IPV6INTF_CREATE:           processIPv6IntfNotifyMsg,
+	asicdCommonDefs.NOTIFY_IPV6INTF_DELETE:           processIPv6IntfNotifyMsg,
+	asicdCommonDefs.NOTIFY_LAG_CREATE:                processLagNotifyMsg,
 	asicdCommonDefs.NOTIFY_LAG_DELETE:                processLagNotifyMsg,
 	asicdCommonDefs.NOTIFY_LAG_UPDATE:                processLagNotifyMsg,
 	asicdCommonDefs.NOTIFY_IPV4NBR_MAC_MOVE:          processIPv4NbrMacMoveNotifyMsg,
@@ -135,6 +137,23 @@ func processIPv4IntfNotifyMsg(rxMsgType uint8, rxMsg []byte, logger *logging.Wri
 		MsgType: rxMsgType,
 		IpAddr:  ipv4Msg.IpAddr,
 		IfIndex: ipv4Msg.IfIndex,
+	}
+
+	return msg, nil
+}
+
+func processIPv6IntfNotifyMsg(rxMsgType uint8, rxMsg []byte, logger *logging.Writer) (commonDefs.AsicdNotifyMsg, error) {
+	var ipv6Msg asicdCommonDefs.IPv6IntfNotifyMsg
+	var msg commonDefs.AsicdNotifyMsg
+	err := json.Unmarshal(rxMsg, &ipv6Msg)
+	if err != nil {
+		logger.Err(fmt.Sprintln("Unable to unmashal IPv6 Intf:", rxMsg))
+		return msg, err
+	}
+	msg = commonDefs.IPv6IntfNotifyMsg{
+		MsgType: rxMsgType,
+		IpAddr:  ipv6Msg.IpAddr,
+		IfIndex: ipv6Msg.IfIndex,
 	}
 
 	return msg, nil
