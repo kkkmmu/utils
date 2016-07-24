@@ -45,7 +45,22 @@ func (asicdClientMgr *MockAsicdClientMgr) UpdateIPv4Neighbor(ipAddr, macAddr str
 	return 0, nil
 }
 
+func (asicdClientMgr *MockAsicdClientMgr) CreateIPv6Neighbor(ipAddr, macAddr string, vlanId, ifIdx int32) (int32, error) {
+	fmt.Println(ipAddr, macAddr, vlanId, ifIdx, asicdClientMgr.Val)
+	return 0, nil
+}
+
+func (asicdClientMgr *MockAsicdClientMgr) UpdateIPv6Neighbor(ipAddr, macAddr string, vlanId, ifIdx int32) (int32, error) {
+	fmt.Println(ipAddr, macAddr, vlanId, ifIdx, asicdClientMgr.Val)
+	return 0, nil
+}
+
 func (asicdClientMgr *MockAsicdClientMgr) DeleteIPv4Neighbor(ipAddr string) (int32, error) {
+	fmt.Println(ipAddr, asicdClientMgr.Val)
+	return 0, nil
+}
+
+func (asicdClientMgr *MockAsicdClientMgr) DeleteIPv6Neighbor(ipAddr string) (int32, error) {
 	fmt.Println(ipAddr, asicdClientMgr.Val)
 	return 0, nil
 }
@@ -77,6 +92,31 @@ func (asicdClientMgr *MockAsicdClientMgr) GetBulkVlan(curMark, count int) (*comm
 
 func (asicdClientMgr *MockAsicdClientMgr) GetAllIPv4IntfState() ([]*commonDefs.IPv4IntfState, error) {
 	fmt.Println("Get all IPv4 Intf State called")
+	return nil, nil
+}
+
+func (asicdClientMgr *MockAsicdClientMgr) GetAllIPv6IntfState() ([]*commonDefs.IPv6IntfState, error) {
+	fmt.Println("Get all IPv6 Intf State called")
+	return nil, nil
+}
+
+func (asicdClientMgr *MockAsicdClientMgr) GetAllPortState() ([]*commonDefs.PortState, error) {
+	fmt.Println("Get all Port Intf State called")
+	return nil, nil
+}
+
+func (asicdClientMgr *MockAsicdClientMgr) GetAllVlanState() ([]*commonDefs.VlanState, error) {
+	fmt.Println("Get all Vlan State called")
+	return nil, nil
+}
+
+func (asicdClientMgr *MockAsicdClientMgr) GetAllVlan() ([]*commonDefs.Vlan, error) {
+	fmt.Println("Get all Vlan called")
+	return nil, nil
+}
+
+func (asicdClientMgr *MockAsicdClientMgr) GetPort(name string) (*commonDefs.Port, error) {
+	fmt.Println("Get Port Intf State called")
 	return nil, nil
 }
 

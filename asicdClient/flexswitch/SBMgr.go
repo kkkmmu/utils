@@ -34,6 +34,7 @@ import (
 	"io/ioutil"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"utils/commonDefs"
 	"utils/ipcutils"
@@ -68,14 +69,22 @@ type FSAsicdClientMgr struct {
 	ClientHdl *asicdServices.ASICDServicesClient
 }
 
+// need to ensure that we are go/thread safe
+var asicdmutex *sync.Mutex = &sync.Mutex{}
 var Logger *logging.Writer
 
 func (asicdClientMgr *FSAsicdClientMgr) CreateIPv4Neighbor(ipAddr, macAddr string, vlanId, ifIdx int32) (int32, error) {
-	return asicdClientMgr.ClientHdl.CreateIPv4Neighbor(ipAddr, macAddr, vlanId, ifIdx)
+	asicdmutex.Lock()
+	val, err := asicdClientMgr.ClientHdl.CreateIPv4Neighbor(ipAddr, macAddr, vlanId, ifIdx)
+	asicdmutex.Unlock()
+	return val, err
 }
 
 func (asicdClientMgr *FSAsicdClientMgr) UpdateIPv4Neighbor(ipAddr, macAddr string, vlanId, ifIdx int32) (int32, error) {
-	return asicdClientMgr.ClientHdl.UpdateIPv4Neighbor(ipAddr, macAddr, vlanId, ifIdx)
+	asicdmutex.Lock()
+	val, err := asicdClientMgr.ClientHdl.UpdateIPv4Neighbor(ipAddr, macAddr, vlanId, ifIdx)
+	asicdmutex.Unlock()
+	return val, err
 }
 
 func (asicdClientMgr *FSAsicdClientMgr) DeleteIPv4Neighbor(ipAddr string) (int32, error) {
@@ -149,7 +158,9 @@ func (asicdClientMgr *FSAsicdClientMgr) convertAsicdPortStateInfoToCommonInfo(in
 }
 
 func (asicdClientMgr *FSAsicdClientMgr) GetBulkIPv4IntfState(curMark, count int) (*commonDefs.IPv4IntfStateGetInfo, error) {
+	asicdmutex.Lock()
 	bulkInfo, err := asicdClientMgr.ClientHdl.GetBulkIPv4IntfState(asicdServices.Int(curMark), asicdServices.Int(count))
+	asicdmutex.Unlock()
 	if bulkInfo == nil {
 		return nil, err
 	}
@@ -175,7 +186,9 @@ func (asicdClientMgr *FSAsicdClientMgr) GetBulkIPv4IntfState(curMark, count int)
 }
 
 func (asicdClientMgr *FSAsicdClientMgr) GetBulkPort(curMark, count int) (*commonDefs.PortGetInfo, error) {
+	asicdmutex.Lock()
 	bulkInfo, err := asicdClientMgr.ClientHdl.GetBulkPort(asicdServices.Int(curMark), asicdServices.Int(count))
+	asicdmutex.Unlock()
 	if bulkInfo == nil {
 		return nil, err
 	}
@@ -202,7 +215,9 @@ func (asicdClientMgr *FSAsicdClientMgr) GetBulkPort(curMark, count int) (*common
 }
 
 func (asicdClientMgr *FSAsicdClientMgr) GetBulkPortState(curMark, count int) (*commonDefs.PortStateGetInfo, error) {
+	asicdmutex.Lock()
 	bulkInfo, err := asicdClientMgr.ClientHdl.GetBulkPortState(asicdServices.Int(curMark), asicdServices.Int(count))
+	asicdmutex.Unlock()
 	if bulkInfo == nil {
 		return nil, err
 	}
@@ -237,7 +252,10 @@ func (asicdClientMgr *FSAsicdClientMgr) GetBulkPortState(curMark, count int) (*c
 }
 
 func (asicdClientMgr *FSAsicdClientMgr) GetBulkVlanState(curMark, count int) (*commonDefs.VlanStateGetInfo, error) {
+
+	asicdmutex.Lock()
 	bulkInfo, err := asicdClientMgr.ClientHdl.GetBulkVlanState(asicdServices.Int(curMark), asicdServices.Int(count))
+	asicdmutex.Unlock()
 	if bulkInfo == nil {
 		return nil, err
 	}
@@ -458,8 +476,10 @@ func (asicdClientMgr *FSAsicdClientMgr) GetAllIPv4IntfState() ([]*commonDefs.IPv
 	count := 100
 	ipv4Info := make([]*commonDefs.IPv4IntfState, 0)
 	for {
+		asicdmutex.Lock()
 		bulkInfo, err := asicdClientMgr.ClientHdl.GetBulkIPv4IntfState(asicdServices.Int(curMark),
 			asicdServices.Int(count))
+		asicdmutex.Unlock()
 		if bulkInfo == nil {
 			return nil, err
 		}
@@ -472,7 +492,6 @@ func (asicdClientMgr *FSAsicdClientMgr) GetAllIPv4IntfState() ([]*commonDefs.IPv
 			break
 		}
 	}
-
 	return ipv4Info, nil
 }
 
@@ -485,7 +504,9 @@ func (asicdClientMgr *FSAsicdClientMgr) GetAllIPv4IntfState() ([]*commonDefs.IPv
  */
 func (asicdClientMgr *FSAsicdClientMgr) DetermineRouterId() string {
 	rtrId := "0.0.0.0"
+	asicdmutex.Lock()
 	allipv4Intfs, err := asicdClientMgr.GetAllIPv4IntfState()
+	asicdmutex.Unlock()
 	if err != nil {
 		return rtrId
 	}
@@ -544,9 +565,9 @@ func asicDPortBmpFormatGet(distPortList []string) string {
 func (asicdClientMgr *FSAsicdClientMgr) GetPortLinkStatus(pId int32) bool {
 
 	if asicdClientMgr.ClientHdl != nil {
-		//asicdmutex.Lock()
+		asicdmutex.Lock()
 		bulkInfo, err := asicdClientMgr.ClientHdl.GetBulkPortState(asicdServices.Int(asicdCommonDefs.MIN_SYS_PORTS), asicdServices.Int(asicdCommonDefs.MAX_SYS_PORTS))
-		//asicdmutex.Unlock()
+		asicdmutex.Unlock()
 		if err == nil && bulkInfo.Count != 0 {
 			objCount := int64(bulkInfo.Count)
 			for i := int64(0); i < objCount; i++ {
@@ -581,9 +602,9 @@ func (asicdClientMgr *FSAsicdClientMgr) CreateStgBridge(vlanList []uint16) int32
 						MacAddrMask: "FF:FF:FF:FF:FF:FF",
 						VlanId:      int32(v),
 					}
-					//asicdmutex.Lock()
+					asicdmutex.Lock()
 					asicdClientMgr.ClientHdl.EnablePacketReception(&protocolmac)
-					//asicdmutex.Unlock()
+					asicdmutex.Unlock()
 				}
 			}
 			return stgid
@@ -614,9 +635,9 @@ func (asicdClientMgr *FSAsicdClientMgr) DeleteStgBridge(stgid int32, vlanList []
 				}
 
 				Logger.Info(fmt.Sprintf("Deleting PVST MAC entry %#v", protocolmac))
-				//asicdmutex.Lock()
+				asicdmutex.Lock()
 				asicdClientMgr.ClientHdl.DisablePacketReception(&protocolmac)
-				//asicdmutex.Unlock()
+				asicdmutex.Unlock()
 			}
 		}
 		Logger.Info(fmt.Sprintf("Deleting Stg Group %d with vlans %#v", stgid, vl))
@@ -633,9 +654,9 @@ func (asicdClientMgr *FSAsicdClientMgr) DeleteStgBridge(stgid int32, vlanList []
 
 func (asicdClientMgr *FSAsicdClientMgr) SetStgPortState(stgid int32, ifindex int32, state int) error {
 	if asicdClientMgr.ClientHdl != nil {
-		//asicdmutex.Lock()
+		asicdmutex.Lock()
 		_, err := asicdClientMgr.ClientHdl.SetPortStpState(stgid, ifindex, int32(state))
-		//asicdmutex.Unlock()
+		asicdmutex.Unlock()
 		return err
 	}
 	return nil
@@ -643,9 +664,9 @@ func (asicdClientMgr *FSAsicdClientMgr) SetStgPortState(stgid int32, ifindex int
 
 func (asicdClientMgr *FSAsicdClientMgr) FlushStgFdb(stgid int32) error {
 	if asicdClientMgr.ClientHdl != nil {
-		//asicdmutex.Lock()
+		asicdmutex.Lock()
 		_, err := asicdClientMgr.ClientHdl.FlushFdbStgGroup(stgid)
-		//asicdmutex.Unlock()
+		asicdmutex.Unlock()
 		return err
 	}
 	return nil
@@ -657,9 +678,9 @@ func (asicdClientMgr *FSAsicdClientMgr) BPDUGuardDetected(ifindex int32, enable 
 		if enable {
 			state = "UP"
 		}
-		//asicdmutex.Lock()
+		asicdmutex.Lock()
 		_, err := asicdClientMgr.ClientHdl.ErrorDisablePort(ifindex, state, "STP BPDU GUARD")
-		//asicdmutex.Unlock()
+		asicdmutex.Unlock()
 		return err
 	}
 	return nil
