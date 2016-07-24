@@ -34,10 +34,16 @@ import (
 	"io/ioutil"
 	"strconv"
 	"time"
+	"utils/asicdClient"
+	"utils/commonDefs"
 	"utils/dbutils"
 	"utils/ipcutils"
 	"utils/keepalive"
 	"utils/logging"
+)
+
+const (
+	CLIENTS_FILE_NAME = "clients.json"
 )
 
 type ClientJson struct {
@@ -66,10 +72,12 @@ type FSBaseDmn struct {
 	ClientsList []ClientJson
 }
 
+// @TODO: need to remove this struct, it duplicate and introducing bugs
 type FSDaemon struct {
 	*FSBaseDmn
-	Asicdclnt           AsicdClient
-	AsicdSubSocket      *nanomsg.SubSocket
+	Asicdclnt      AsicdClient
+	AsicdSubSocket *nanomsg.SubSocket
+	// @ALERT ANY FUTURE DEVELOPER PLEASE DO NOT USE THIS, REFER NDP AND SEE HOW TO USE FSBaseDmn
 	AsicdSubSocketCh    chan []byte
 	AsicdSubSocketErrCh chan error
 }
@@ -134,6 +142,10 @@ func (dmn *FSBaseDmn) StartKeepAlive() {
 	go keepalive.InitKeepAlive(dmn.DmnName, dmn.ParamsDir)
 }
 
+func (dmn *FSDaemon) StartKeepAlive() {
+	dmn.FSBaseDmn.StartKeepAlive()
+}
+
 func NewBaseDmn(dmnName, logPrefix string) *FSBaseDmn {
 	var dmn = new(FSBaseDmn)
 	dmn.DmnName = dmnName
@@ -148,16 +160,20 @@ func (dmn *FSDaemon) ConnectToAsicd() error {
 		if client.Name == "asicd" {
 			dmn.Logger.Info(fmt.Sprintln("found  asicd at port ", client.Port))
 			dmn.Asicdclnt.Address = "localhost:" + strconv.Itoa(client.Port)
-			dmn.Asicdclnt.Transport, dmn.Asicdclnt.PtrProtocolFactory, err = ipcutils.CreateIPCHandles(dmn.Asicdclnt.Address)
+			dmn.Asicdclnt.Transport, dmn.Asicdclnt.PtrProtocolFactory, err =
+				ipcutils.CreateIPCHandles(dmn.Asicdclnt.Address)
 			if dmn.Asicdclnt.Transport != nil && dmn.Asicdclnt.PtrProtocolFactory != nil {
-				dmn.Asicdclnt.ClientHdl = asicdServices.NewASICDServicesClientFactory(dmn.Asicdclnt.Transport, dmn.Asicdclnt.PtrProtocolFactory)
+				dmn.Asicdclnt.ClientHdl =
+					asicdServices.NewASICDServicesClientFactory(dmn.Asicdclnt.Transport,
+						dmn.Asicdclnt.PtrProtocolFactory)
 				dmn.Asicdclnt.IsConnected = true
 			} else {
 				dmn.Logger.Info(fmt.Sprintf("Failed to connect to Asicd, retrying until connection is successful"))
 				count := 0
 				ticker := time.NewTicker(time.Duration(1000) * time.Millisecond)
 				for _ = range ticker.C {
-					dmn.Asicdclnt.Transport, dmn.Asicdclnt.PtrProtocolFactory, err = ipcutils.CreateIPCHandles(dmn.Asicdclnt.Address)
+					dmn.Asicdclnt.Transport, dmn.Asicdclnt.PtrProtocolFactory, err =
+						ipcutils.CreateIPCHandles(dmn.Asicdclnt.Address)
 					if err == nil {
 						ticker.Stop()
 						break
@@ -232,6 +248,7 @@ func (dmn *FSDaemon) ConnectToServers() error {
 	return nil
 }
 
+// @TODO: remove this when l2 & l3 daemons have moved to Plugin Model
 func (dmn *FSDaemon) Init(dmnName, logPrefix string) bool {
 	dmn.FSBaseDmn = NewBaseDmn(dmnName, logPrefix)
 	return dmn.FSBaseDmn.Init()
@@ -240,4 +257,18 @@ func (dmn *FSDaemon) Init(dmnName, logPrefix string) bool {
 func (dmn *FSDaemon) NewServer() {
 	dmn.AsicdSubSocketCh = make(chan []byte)
 	dmn.AsicdSubSocketErrCh = make(chan error)
+}
+
+func (dmn *FSBaseDmn) GetLogger() *logging.Writer {
+	return dmn.Logger
+}
+
+func (dmn *FSBaseDmn) GetDbHdl() *dbutils.DBUtil {
+	return dmn.DbHdl
+}
+
+func (dmn *FSBaseDmn) InitSwitch(plugin, dmnName, logPrefix string, switchHdl commonDefs.AsicdClientStruct) asicdClient.AsicdClientIntf {
+	// @TODO: need to change second argument
+	return asicdClient.NewAsicdClientInit(plugin, dmn.ParamsDir+"clients.json", switchHdl)
+
 }

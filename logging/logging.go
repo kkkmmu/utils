@@ -214,9 +214,9 @@ func (logger *Writer) Err(message string) error {
 	if logger.initialized {
 		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.ERR {
 			return logger.SysLogger.Err(message)
-		} else if logger.nullLogger != nil {
-			logger.nullLogger.Println(message)
 		}
+	} else if logger.nullLogger != nil {
+		logger.nullLogger.Println(message)
 	}
 	return nil
 }
@@ -225,9 +225,9 @@ func (logger *Writer) Warning(message string) error {
 	if logger.initialized {
 		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.WARN {
 			return logger.SysLogger.Warning(message)
-		} else if logger.nullLogger != nil {
-			logger.nullLogger.Println(message)
 		}
+	} else if logger.nullLogger != nil {
+		logger.nullLogger.Println(message)
 	}
 	return nil
 }
@@ -236,9 +236,9 @@ func (logger *Writer) Alert(message string) error {
 	if logger.initialized {
 		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.ALERT {
 			return logger.SysLogger.Alert(message)
-		} else if logger.nullLogger != nil {
-			logger.nullLogger.Println(message)
 		}
+	} else if logger.nullLogger != nil {
+		logger.nullLogger.Println(message)
 	}
 	return nil
 }
@@ -247,9 +247,9 @@ func (logger *Writer) Emerg(message string) error {
 	if logger.initialized {
 		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.EMERG {
 			return logger.SysLogger.Emerg(message)
-		} else if logger.nullLogger != nil {
-			logger.nullLogger.Println(message)
 		}
+	} else if logger.nullLogger != nil {
+		logger.nullLogger.Println(message)
 	}
 	return nil
 }
@@ -258,9 +258,9 @@ func (logger *Writer) Notice(message string) error {
 	if logger.initialized {
 		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.NOTICE {
 			return logger.SysLogger.Notice(message)
-		} else if logger.nullLogger != nil {
-			logger.nullLogger.Println(message)
 		}
+	} else if logger.nullLogger != nil {
+		logger.nullLogger.Println(message)
 	}
 	return nil
 }
@@ -269,9 +269,9 @@ func (logger *Writer) Info(message string) error {
 	if logger.initialized {
 		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.INFO {
 			return logger.SysLogger.Info(message)
-		} else if logger.nullLogger != nil {
-			logger.nullLogger.Println(message)
 		}
+	} else if logger.nullLogger != nil {
+		logger.nullLogger.Println(message)
 	}
 	return nil
 }
@@ -280,9 +280,9 @@ func (logger *Writer) Println(message string) error {
 	if logger.initialized {
 		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.INFO {
 			return logger.SysLogger.Info(message)
-		} else if logger.nullLogger != nil {
-			logger.nullLogger.Println(message)
 		}
+	} else if logger.nullLogger != nil {
+		logger.nullLogger.Println(message)
 	}
 	return nil
 }
@@ -291,9 +291,9 @@ func (logger *Writer) Debug(message string) error {
 	if logger.initialized {
 		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.DEBUG {
 			return logger.SysLogger.Debug(message)
-		} else if logger.nullLogger != nil {
-			logger.nullLogger.Println(message)
 		}
+	} else if logger.nullLogger != nil {
+		logger.nullLogger.Println(message)
 	}
 	return nil
 }
@@ -303,9 +303,9 @@ func (logger *Writer) Write(message string) (int, error) {
 		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.TRACE {
 			n, err := logger.SysLogger.Write([]byte(message))
 			return n, err
-		} else if logger.nullLogger != nil {
-			logger.nullLogger.Println(message)
 		}
+	} else if logger.nullLogger != nil {
+		logger.nullLogger.Println(message)
 	}
 	return 0, nil
 }

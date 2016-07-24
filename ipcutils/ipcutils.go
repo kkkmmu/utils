@@ -27,6 +27,7 @@ import (
 	//"fmt"
 	"git.apache.org/thrift.git/lib/go/thrift"
 	"models/objects"
+	"sync"
 )
 
 type IPCClientBase struct {
@@ -35,6 +36,7 @@ type IPCClientBase struct {
 	TTransport         thrift.TTransport
 	PtrProtocolFactory *thrift.TBinaryProtocolFactory
 	IsConnected        bool
+	ApiHandlerMutex    sync.RWMutex
 }
 
 func (clnt *IPCClientBase) IsConnectedToServer() bool {

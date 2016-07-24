@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 // policyEngine.go
 package policy
@@ -229,22 +229,21 @@ func (db *PolicyEngineDB) FindPrefixMatch(ipAddr string, ipPrefix patriciaDB.Pre
 	return match
 }*/
 func (db *PolicyEngineDB) FindPrefixMatch(ipAddr string, ipPrefix patriciaDB.Prefix, condition PolicyCondition) (match bool) {
-	db.Logger.Println(fmt.Sprintln("ipAddr : ", ipAddr, " ipPrefix: ", ipPrefix, " condition.IpPrefix: ", condition.ConditionInfo.(MatchPrefixConditionInfo).IpPrefix, " conditionInfo,MaskLengthRange: ", condition.ConditionInfo.(MatchPrefixConditionInfo).Prefix.IpPrefix))
+	db.Logger.Info(fmt.Sprintln("ipAddr : ", ipAddr, " ipPrefix: ", ipPrefix, " condition.IpPrefix: ", condition.ConditionInfo.(MatchPrefixConditionInfo).IpPrefix, " conditionInfo,MaskLengthRange: ", condition.ConditionInfo.(MatchPrefixConditionInfo).Prefix.IpPrefix))
 	conditionInfo := condition.ConditionInfo.(MatchPrefixConditionInfo)
 	if conditionInfo.LowRange == -1 && conditionInfo.HighRange == -1 {
-	    _, ipNet, err := net.ParseCIDR(condition.ConditionInfo.(MatchPrefixConditionInfo).Prefix.IpPrefix)
-	    if err != nil {
-		    return false
- 	    }
+		_, ipNet, err := net.ParseCIDR(condition.ConditionInfo.(MatchPrefixConditionInfo).Prefix.IpPrefix)
+		if err != nil {
+			return false
+		}
 		if bytes.Equal(ipPrefix, conditionInfo.IpPrefix) {
 			db.Logger.Info(fmt.Sprintln(" Matched the prefix"))
 			return true
 		}
 		networkMask := ipNet.Mask
-	    vdestMask := net.IPv4Mask(networkMask[0], networkMask[1], networkMask[2], networkMask[3])
-        destIp := (net.IP(ipPrefix)).Mask(vdestMask)
-		db.Logger.Println(fmt.Sprintln("networkMask: ", networkMask, " vdestMask: ", vdestMask, " destIp: ", destIp))
-		db.Logger.Info(fmt.Sprintln("Looking for exact match condition for prefix ", conditionInfo.IpPrefix, " and ", destIp))
+		vdestMask := net.IPv4Mask(networkMask[0], networkMask[1], networkMask[2], networkMask[3])
+		destIp := (net.IP(ipPrefix)).Mask(vdestMask)
+		db.Logger.Info(fmt.Sprintln("networkMask: ", networkMask, " vdestMask: ", vdestMask, " destIp: ", destIp, "Looking for exact match condition for prefix ", conditionInfo.IpPrefix, " and ", destIp))
 		if bytes.Equal(destIp, conditionInfo.IpPrefix) {
 			db.Logger.Info(fmt.Sprintln(" Matched the prefix"))
 			return true
@@ -390,7 +389,7 @@ func (db *PolicyEngineDB) PolicyEngineApplyPolicyStmt(entity *PolicyEngineFilter
 			conditionInfoList = append(conditionInfoList, conditionList[j].ConditionInfo)
 		}
 	}
-	actionList := db.PolicyEngineImplementActions(*entity, info.Action, conditionInfoList, params,policyStmt)
+	actionList := db.PolicyEngineImplementActions(*entity, info.Action, conditionInfoList, params, policyStmt)
 	if db.ActionListHasAction(actionList, policyCommonDefs.PolicyActionTypeRouteDisposition, "Reject") {
 		db.Logger.Info(fmt.Sprintln("Reject action was applied for this entity"))
 		*deleted = true
@@ -603,7 +602,7 @@ func (db *PolicyEngineDB) PolicyEngineTraverseAndReversePolicy(policy Policy) {
 }
 
 func (db *PolicyEngineDB) PolicyEngineFilter(entity PolicyEngineFilterEntityParams, policyPath int, params interface{}) {
-	db.Logger.Info(fmt.Sprintln("PolicyEngineFilter"))
+	/*db.Logger.Info(fmt.Sprintln("PolicyEngineFilter"))
 	var policyPath_Str string
 	if policyPath == policyCommonDefs.PolicyPath_Import {
 		policyPath_Str = "Import"
@@ -614,7 +613,7 @@ func (db *PolicyEngineDB) PolicyEngineFilter(entity PolicyEngineFilterEntityPara
 		db.Logger.Info(fmt.Sprintln("policy path ", policyPath_Str, " unexpected in this function"))
 		return
 	}
-	db.Logger.Info(fmt.Sprintln("PolicyEngineFilter for policypath ", policyPath_Str, "create = ", entity.CreatePath, " delete = ", entity.DeletePath, " route: ", entity.DestNetIp, " protocol type: ", entity.RouteProtocol))
+	db.Logger.Info(fmt.Sprintln("PolicyEngineFilter for policypath ", policyPath_Str, "create = ", entity.CreatePath, " delete = ", entity.DeletePath, " route: ", entity.DestNetIp, " protocol type: ", entity.RouteProtocol))*/
 	var policyKeys []int
 	var policyHit bool
 	idx := 0
@@ -635,19 +634,19 @@ func (db *PolicyEngineDB) PolicyEngineFilter(entity PolicyEngineFilterEntityPara
 				if idx >= len(entity.PolicyList) {
 					break
 				}
-				db.Logger.Info(fmt.Sprintln("getting policy ", idx, " from entity.PolicyList"))
+				//db.Logger.Info(fmt.Sprintln("getting policy ", idx, " from entity.PolicyList"))
 				policyInfo = db.PolicyDB.Get(patriciaDB.Prefix(entity.PolicyList[idx]))
 				idx++
 				if policyInfo.(Policy).ExportPolicy && policyPath == policyCommonDefs.PolicyPath_Import || policyInfo.(Policy).ImportPolicy && policyPath == policyCommonDefs.PolicyPath_Export {
-					db.Logger.Info(fmt.Sprintln("policy ", policyInfo.(Policy).Name, " not the same type as the policypath -", policyPath_Str))
+					//		db.Logger.Info(fmt.Sprintln("policy ", policyInfo.(Policy).Name, " not the same type as the policypath -", policyPath_Str))
 					continue
 				}
 			} else {
-				db.Logger.Info(fmt.Sprintln("PolicyList empty and this is a delete operation, so break"))
+				//db.Logger.Info(fmt.Sprintln("PolicyList empty and this is a delete operation, so break"))
 				break
 			}
 		} else if entity.CreatePath == true { //policyEngine filter called during create
-			db.Logger.Info(fmt.Sprintln("idx = ", idx, " len(policyKeys):", len(policyKeys)))
+			//db.Logger.Info(fmt.Sprintln("idx = ", idx, " len(policyKeys):", len(policyKeys)))
 			if idx >= len(policyKeys) {
 				break
 			}
@@ -657,7 +656,7 @@ func (db *PolicyEngineDB) PolicyEngineFilter(entity PolicyEngineFilterEntityPara
 			} else if policyPath == policyCommonDefs.PolicyPath_Export {
 				policyName = db.ExportPolicyPrecedenceMap[policyKeys[idx]]
 			}
-			db.Logger.Info(fmt.Sprintln("getting policy  ", idx, " policyKeys[idx] = ", policyKeys[idx], " ", policyName, " from PolicyDB"))
+			//db.Logger.Info(fmt.Sprintln("getting policy  ", idx, " policyKeys[idx] = ", policyKeys[idx], " ", policyName, " from PolicyDB"))
 			policyInfo = db.PolicyDB.Get((patriciaDB.Prefix(policyName)))
 			idx++
 		}
@@ -668,31 +667,31 @@ func (db *PolicyEngineDB) PolicyEngineFilter(entity PolicyEngineFilterEntityPara
 		policy := policyInfo.(Policy)
 		localPolicyDB := *db.LocalPolicyDB
 		if localPolicyDB != nil && localPolicyDB[policy.LocalDBSliceIdx].IsValid == false {
-			db.Logger.Info(fmt.Sprintln("Invalid policy at localDB slice idx ", policy.LocalDBSliceIdx))
+			//db.Logger.Info(fmt.Sprintln("Invalid policy at localDB slice idx ", policy.LocalDBSliceIdx))
 			continue
 		}
 		applyList := db.ApplyPolicyMap[policy.Name]
 		if applyList == nil {
-			db.Logger.Info(fmt.Sprintln("no application for this policy ", policy.Name))
+			//db.Logger.Info(fmt.Sprintln("no application for this policy ", policy.Name))
 			continue
 		}
 		for j := 0; j < len(applyList); j++ {
 			db.PolicyEngineApplyPolicy(&entity, applyList[j], policyPath, params, &policyHit)
 			if policyHit {
-				db.Logger.Info(fmt.Sprintln("Policy ", policy.Name, " applied to the route"))
+				//db.Logger.Info(fmt.Sprintln("Policy ", policy.Name, " applied to the route"))
 				break
 			}
 		}
 	}
 	if entity.PolicyHitCounter == 0 {
-		db.Logger.Info(fmt.Sprintln("Need to apply default policy, policyPath = ", policyPath, "policyPath_Str= ", policyPath_Str))
+		//db.Logger.Info(fmt.Sprintln("Need to apply default policy, policyPath = ", policyPath, "policyPath_Str= ", policyPath_Str))
 		if policyPath == policyCommonDefs.PolicyPath_Import {
-			db.Logger.Info(fmt.Sprintln("Applying default import policy"))
+			//db.Logger.Info(fmt.Sprintln("Applying default import policy"))
 			if db.DefaultImportPolicyActionFunc != nil {
 				db.DefaultImportPolicyActionFunc(nil, nil, params)
 			}
 		} else if policyPath == policyCommonDefs.PolicyPath_Export {
-			db.Logger.Info(fmt.Sprintln("Applying default export policy"))
+			//db.Logger.Info(fmt.Sprintln("Applying default export policy"))
 			if db.DefaultExportPolicyActionFunc != nil {
 				db.DefaultExportPolicyActionFunc(nil, nil, params)
 			}

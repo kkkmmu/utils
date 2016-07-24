@@ -34,14 +34,37 @@ type AsicdClientIntf interface {
 	UpdateIPv4Neighbor(ipAddr string, macAddr string, vlanId int32, ifIdx int32) (rv int32, err error)
 	DeleteIPv4Neighbor(ipAddr string) (rv int32, err error)
 
+	CreateIPv6Neighbor(ipAddr string, macAddr string, vlanId int32, ifIdx int32) (rv int32, err error)
+	UpdateIPv6Neighbor(ipAddr string, macAddr string, vlanId int32, ifIdx int32) (rv int32, err error)
+	DeleteIPv6Neighbor(ipAddr string) (rv int32, err error)
+
 	GetBulkIPv4IntfState(curMark, count int) (*commonDefs.IPv4IntfStateGetInfo, error)
 	GetAllIPv4IntfState() ([]*commonDefs.IPv4IntfState, error)
-
+	GetAllIPv6IntfState() ([]*commonDefs.IPv6IntfState, error)
+	GetAllPortState() ([]*commonDefs.PortState, error)
 	GetBulkPort(curMark, count int) (*commonDefs.PortGetInfo, error)
 	GetBulkPortState(curMark, count int) (*commonDefs.PortStateGetInfo, error)
 	GetBulkVlan(curMark, count int) (*commonDefs.VlanGetInfo, error)
 	GetBulkVlanState(curMark, count int) (*commonDefs.VlanStateGetInfo, error)
+	GetAllVlanState() ([]*commonDefs.VlanState, error)
+	GetAllVlan() ([]*commonDefs.Vlan, error)
 	DetermineRouterId() string
+	GetPort(string) (*commonDefs.Port, error)
+
+	// get the switch MAC given in string format
+	GetSwitchMAC(paramsPath string) string
+
+	// Get the current link status of a link
+	GetPortLinkStatus(pId int32) bool
+	// create stp bridge, map vlans to stg, stgid returned by caller
+	CreateStgBridge(vlanList []uint16) int32
+	DeleteStgBridge(stgid int32, vlanList []uint16) error
+	// set forwarding/learning/blocked state
+	SetStgPortState(stgid int32, ifindex int32, state int) error
+	// Flush the macs associated with this stg
+	FlushStgFdb(stgid int32) error
+	// BPDU Guard detection
+	BPDUGuardDetected(ifindex int32, enable bool) error
 }
 
 func NewAsicdClientInit(plugin string, paramsFile string, asicdHdl commonDefs.AsicdClientStruct) AsicdClientIntf {

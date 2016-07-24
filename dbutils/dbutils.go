@@ -29,6 +29,7 @@ import (
 	"github.com/garyburd/redigo/redis"
 	"models/objects"
 	"reflect"
+	"sync"
 	"time"
 	"utils/logging"
 )
@@ -52,6 +53,7 @@ type DBUtil struct {
 	logger  *logging.Writer
 	network string
 	address string
+	DbLock  sync.RWMutex
 }
 
 type DBIntf interface {
@@ -77,6 +79,7 @@ func NewDBUtil(logger *logging.Writer) *DBUtil {
 		logger:  logger,
 		network: "tcp",
 		address: ":6379",
+		DbLock:  sync.RWMutex{},
 	}
 }
 
@@ -116,6 +119,8 @@ func (db *DBUtil) Disconnect() {
 }
 
 func (db *DBUtil) StoreObjectInDb(obj objects.ConfigObj) error {
+	defer db.DbLock.Unlock()
+	db.DbLock.Lock()
 	return obj.StoreObjectInDb(db.Conn)
 }
 
@@ -123,6 +128,8 @@ func (db *DBUtil) DeleteObjectFromDb(obj objects.ConfigObj) error {
 	if db.Conn == nil {
 		return DBNotConnectedError{db.network, db.address}
 	}
+	defer db.DbLock.Unlock()
+	db.DbLock.Lock()
 	return obj.DeleteObjectFromDb(db.Conn)
 }
 
@@ -130,10 +137,14 @@ func (db *DBUtil) GetObjectFromDb(obj objects.ConfigObj, objKey string) (objects
 	if db.Conn == nil {
 		return obj, DBNotConnectedError{db.network, db.address}
 	}
+	defer db.DbLock.Unlock()
+	db.DbLock.Lock()
 	return obj.GetObjectFromDb(objKey, db.Conn)
 }
 
 func (db *DBUtil) GetKey(obj objects.ConfigObj) string {
+	defer db.DbLock.Unlock()
+	db.DbLock.Lock()
 	return obj.GetKey()
 }
 
@@ -141,6 +152,8 @@ func (db *DBUtil) GetAllObjFromDb(obj objects.ConfigObj) ([]objects.ConfigObj, e
 	if db.Conn == nil {
 		return make([]objects.ConfigObj, 0), DBNotConnectedError{db.network, db.address}
 	}
+	defer db.DbLock.Unlock()
+	db.DbLock.Lock()
 	return obj.GetAllObjFromDb(db.Conn)
 }
 
@@ -149,6 +162,8 @@ func (db *DBUtil) CompareObjectsAndDiff(obj objects.ConfigObj, updateKeys map[st
 	if db.Conn == nil {
 		return make([]bool, 0), DBNotConnectedError{db.network, db.address}
 	}
+	defer db.DbLock.Unlock()
+	db.DbLock.Lock()
 	return obj.CompareObjectsAndDiff(updateKeys, inObj)
 }
 
@@ -156,10 +171,14 @@ func (db *DBUtil) UpdateObjectInDb(obj, inObj objects.ConfigObj, attrSet []bool)
 	if db.Conn == nil {
 		return DBNotConnectedError{db.network, db.address}
 	}
+	defer db.DbLock.Unlock()
+	db.DbLock.Lock()
 	return obj.UpdateObjectInDb(inObj, attrSet, db.Conn)
 }
 
 func (db *DBUtil) MergeDbAndConfigObj(obj, dbObj objects.ConfigObj, attrSet []bool) (objects.ConfigObj, error) {
+	defer db.DbLock.Unlock()
+	db.DbLock.Lock()
 	return obj.MergeDbAndConfigObj(dbObj, attrSet)
 }
 
@@ -168,21 +187,25 @@ func (db *DBUtil) GetBulkObjFromDb(obj objects.ConfigObj, startIndex, count int6
 	if db.Conn == nil {
 		return DBNotConnectedError{db.network, db.address}, 0, 0, false, make([]objects.ConfigObj, 0)
 	}
+	defer db.DbLock.Unlock()
+	db.DbLock.Lock()
 	return obj.GetBulkObjFromDb(startIndex, count, db.Conn)
 }
 
 func (db *DBUtil) Publish(op string, channel interface{}, msg interface{}) {
 	if db.Conn != nil {
+		defer db.DbLock.Unlock()
+		db.DbLock.Lock()
 		db.Do(op, channel, msg)
 	}
 }
 
 func (db *DBUtil) StoreValInDb(key interface{}, val interface{}, field interface{}) error {
 	if db.Conn != nil {
+		defer db.DbLock.Unlock()
+		db.DbLock.Lock()
 		_, err := db.Do("HMSET", key, field, val)
-		if err != nil {
-			return err
-		}
+		return err
 	}
 	err := errors.New("DB Connection handler is nil")
 	return err
@@ -190,6 +213,8 @@ func (db *DBUtil) StoreValInDb(key interface{}, val interface{}, field interface
 
 func (db *DBUtil) GetAllKeys(pattern interface{}) (val interface{}, err error) {
 	if db.Conn != nil {
+		defer db.DbLock.Unlock()
+		db.DbLock.Lock()
 		val, err = db.Do("KEYS", pattern)
 		return val, err
 	}
@@ -199,6 +224,8 @@ func (db *DBUtil) GetAllKeys(pattern interface{}) (val interface{}, err error) {
 
 func (db *DBUtil) GetValFromDB(key interface{}, field interface{}) (val interface{}, err error) {
 	if db.Conn != nil {
+		defer db.DbLock.Unlock()
+		db.DbLock.Lock()
 		val, err := db.Do("HGET", key, field)
 		return val, err
 	}

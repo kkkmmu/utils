@@ -141,6 +141,8 @@ const (
 	NOTIFY_LOGICAL_INTF_UPDATE
 	NOTIFY_IPV4INTF_CREATE
 	NOTIFY_IPV4INTF_DELETE
+	NOTIFY_IPV6INTF_CREATE
+	NOTIFY_IPV6INTF_DELETE
 	NOTIFY_LAG_CREATE
 	NOTIFY_LAG_DELETE
 	NOTIFY_LAG_UPDATE
@@ -198,6 +200,19 @@ type IPv4NbrMacMoveNotifyMsg struct {
 	VlanId  int32
 }
 
+type IPv6NbrMacMoveNotifyMsg struct {
+	MsgType uint8
+	IpAddr  string
+	IfIndex int32
+	VlanId  int32
+}
+
+type IPv6IntfNotifyMsg struct {
+	MsgType uint8
+	IpAddr  string
+	IfIndex int32
+}
+
 type AsicdNotificationHdl interface {
 	ProcessNotification(msg AsicdNotifyMsg)
 }
@@ -210,4 +225,17 @@ type AsicdClientStruct struct {
 	Logger *logging.Writer
 	NHdl   AsicdNotificationHdl
 	NMap   AsicdNotification
+}
+
+type IPv6IntfState struct {
+	IntfRef           string
+	IfIndex           int32
+	IpAddr            string
+	OperState         string
+	NumUpEvents       int32
+	LastUpEventTime   string
+	NumDownEvents     int32
+	LastDownEventTime string
+	L2IntfType        string
+	L2IntfId          int32
 }
