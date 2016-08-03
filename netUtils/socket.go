@@ -110,7 +110,7 @@ func Socket(family, sotype, proto int) (int, error) {
 }
 
 func ConnectSocket(network, remote, local string) (int, error) {
-	fmt.Println("ConnectSocket: network=", network, "remote =", remote, "local =", local)
+	//fmt.Println("ConnectSocket: network=", network, "remote =", remote, "local =", local)
 	var localAddr net.Addr
 	var socketType, proto int
 	netAddr, err := resolveAddress(network, remote)
@@ -138,7 +138,7 @@ func ConnectSocket(network, remote, local string) (int, error) {
 		localAddr, _ = localAddr.(*net.UDPAddr)
 		socketType = syscall.SOCK_DGRAM
 	default:
-		fmt.Println("ConnectSocket: remote is not TCPAddr or UDPAddr")
+		//fmt.Println("ConnectSocket: remote is not TCPAddr or UDPAddr")
 		return -1, &net.OpError{Op: "dial", Net: network, Source: localAddr, Addr: netAddr,
 			Err: &net.AddrError{Err: "unexpected address type", Addr: remote}}
 	}

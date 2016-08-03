@@ -24,7 +24,7 @@
 package flexswitch
 
 import (
-	"fmt"
+	//	"fmt"
 	"models/objects"
 	"utils/dbutils"
 	"utils/logging"
@@ -57,14 +57,14 @@ func NewFSDBClient(logger *logging.Writer) *FSDBClient {
 	return &FSDBClient{
 		logger:     logger,
 		dbUtil:     dbutils.NewDBUtil(logger),
-		objStateCh: make(chan objInfo, 100),
+		objStateCh: make(chan objInfo, 10000),
 	}
 }
 
 func (fs *FSDBClient) Init() error {
 	err := fs.dbUtil.Connect()
 	if err != nil {
-		fs.logger.Err(fmt.Sprintf("FSDBClient - DB connect failed with error %s", err))
+		fs.logger.Err("FSDBClient - DB connect failed with error ", err)
 		return err
 	}
 
@@ -73,29 +73,29 @@ func (fs *FSDBClient) Init() error {
 }
 
 func (fs *FSDBClient) AddObject(obj objects.ConfigObj) error {
-	fs.logger.Info(fmt.Sprintf("AddObject object %s", obj.GetKey()))
+	fs.logger.Info("AddObject object %s", obj.GetKey())
 	fs.objStateCh <- objInfo{objAdd, obj}
 	return nil
 }
 
 func (fs *FSDBClient) DeleteObject(obj objects.ConfigObj) error {
-	fs.logger.Info(fmt.Sprintf("DeleteObject object %s", obj.GetKey()))
+	fs.logger.Info("DeleteObject object %s", obj.GetKey())
 	fs.objStateCh <- objInfo{objDelete, obj}
 	return nil
 }
 
 func (fs *FSDBClient) UpdateObject(obj objects.ConfigObj) error {
-	fs.logger.Info(fmt.Sprintf("UpdateObject object %s", obj.GetKey()))
+	fs.logger.Info("UpdateObject object %s", obj.GetKey())
 	fs.objStateCh <- objInfo{objUpdate, obj}
 	return nil
 }
 
 /* This is done synchronously as we delete all the objects in the state DB when a process comes up */
 func (fs *FSDBClient) DeleteAllObjects(obj objects.ConfigObj) error {
-	fs.logger.Info(fmt.Sprintf("DeleteAllObjects object %s", obj.GetKey()))
+	fs.logger.Info("DeleteAllObjects object %s", obj.GetKey())
 	objs, err := fs.dbUtil.GetAllObjFromDb(obj)
 	if err != nil {
-		fs.logger.Err(fmt.Sprintf("DeleteAllObjects - GetAllObjFromDb failed with error %s", err))
+		fs.logger.Err("DeleteAllObjects - GetAllObjFromDb failed with error %s", err)
 		return err
 	}
 
@@ -106,24 +106,24 @@ func (fs *FSDBClient) DeleteAllObjects(obj objects.ConfigObj) error {
 }
 
 func (fs *FSDBClient) addObjToDB(obj objects.ConfigObj) error {
-	fs.logger.Info(fmt.Sprintf("addObjToDB object %s", obj.GetKey()))
+	//fs.logger.Info("addObjToDB object %s", obj.GetKey())
 	err := fs.dbUtil.StoreObjectInDb(obj)
 	if err != nil {
-		fs.logger.Err(fmt.Sprintf("Failed to add state object %s to DB with error %s", obj.GetKey(), err))
+		fs.logger.Err("Failed to add state object %s to DB with error %s", obj.GetKey(), err)
 		return err
 	}
-	fs.logger.Info(fmt.Sprintf("Added state object %s to DB", obj.GetKey()))
+	//fs.logger.Info("Added state object %s to DB", obj.GetKey())
 	return nil
 }
 
 func (fs *FSDBClient) delObjToDB(obj objects.ConfigObj) error {
-	fs.logger.Info(fmt.Sprintf("delObjToDB object %s", obj.GetKey()))
+	//fs.logger.Info("delObjToDB object %s", obj.GetKey())
 	err := fs.dbUtil.DeleteObjectFromDb(obj)
 	if err != nil {
-		fs.logger.Err(fmt.Sprintf("Failed to delete state object %s from DB with error", obj.GetKey(), err))
+		fs.logger.Err("Failed to delete state object %s from DB with error", obj.GetKey(), err)
 		return err
 	}
-	fs.logger.Info(fmt.Sprintf("Deleted state object %s from DB", obj.GetKey()))
+	fs.logger.Info("Deleted state object %s from DB", obj.GetKey())
 	return nil
 }
 
@@ -146,13 +146,13 @@ func (fs *FSDBClient) StartStateObjectReceiver() {
 					err = fs.addObjToDB(info.obj)
 				}
 			} else {
-				fs.logger.Err(fmt.Sprintf("Recieved unknown operation %d for state object %s", info.operation,
-					info.obj.GetKey()))
+				fs.logger.Err("Recieved unknown operation %d for state object %s", info.operation,
+					info.obj.GetKey())
 			}
 
 			if err != nil {
-				fs.logger.Err(fmt.Sprintf("Failed to %s state object %s", objOperation[info.operation],
-					info.obj.GetKey()))
+				fs.logger.Err("Failed to %s state object %s", objOperation[info.operation],
+					info.obj.GetKey())
 			}
 		}
 	}

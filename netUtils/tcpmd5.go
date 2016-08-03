@@ -57,11 +57,11 @@ func getMD5Sig(ipAddr string, key string) (*tcpMD5Sig, error) {
 
 	sig := NewTCPMD5Sig()
 	if ip = addr.To4(); ip != nil {
-		fmt.Println("getMD5Sig - ip", ip, "is a v4 address")
+		//fmt.Println("getMD5Sig - ip", ip, "is a v4 address")
 		family = syscall.AF_INET
 		idx = 2
 	} else if ip = addr.To16(); ip != nil {
-		fmt.Println("getMD5Sig - ip", ip, "is a v6 address")
+		//fmt.Println("getMD5Sig - ip", ip, "is a v6 address")
 		family = syscall.AF_INET6
 		idx = 6
 	}
@@ -80,7 +80,7 @@ func getMD5Sig(ipAddr string, key string) (*tcpMD5Sig, error) {
 }
 
 func SetSockoptTCPMD5(socket int, ipAddr, key string) error {
-	fmt.Println("SetSockoptTCPMD5 - start, socket", socket, "ip address", ipAddr, "md5 key", key)
+	//fmt.Println("SetSockoptTCPMD5 - start, socket", socket, "ip address", ipAddr, "md5 key", key)
 	sig, err := getMD5Sig(ipAddr, key)
 	if err != nil {
 		fmt.Println("SetSockoptTCPMD5 - getMD5Sig failed with error", err)
@@ -89,7 +89,7 @@ func SetSockoptTCPMD5(socket int, ipAddr, key string) error {
 	_, _, errNo := syscall.Syscall6(syscall.SYS_SETSOCKOPT, uintptr(socket), uintptr(syscall.IPPROTO_TCP),
 		uintptr(14), uintptr(unsafe.Pointer(sig)), unsafe.Sizeof(*sig), 0)
 
-	fmt.Println("SetSockoptTCPMD5 - syscall.Syscall6 returned", errNo)
+	//fmt.Println("SetSockoptTCPMD5 - syscall.Syscall6 returned", errNo)
 	if errNo != 0 {
 		err = errNo
 	}
@@ -98,7 +98,7 @@ func SetSockoptTCPMD5(socket int, ipAddr, key string) error {
 }
 
 func getListenerFile(l *net.TCPListener) (*os.File, error) {
-	fmt.Println("getListenerFd - start")
+	//fmt.Println("getListenerFd - start")
 	file, err := l.File()
 	if err != nil {
 		fmt.Println("getListenerFd - failed to get File for TCP listener with error", err)
@@ -108,14 +108,14 @@ func getListenerFile(l *net.TCPListener) (*os.File, error) {
 	if listener, err := net.FileListener(file); err == nil {
 		defer listener.Close()
 	} else {
-		fmt.Println("getListenerFd - failed to get FileListener for File", file, "with error", err)
+		//fmt.Println("getListenerFd - failed to get FileListener for File", file, "with error", err)
 		goto closefile
 	}
 
 	return file, nil
 
 closefile:
-	fmt.Println("getListenerFd - file close")
+	//fmt.Println("getListenerFd - file close")
 	file.Close()
 fail:
 	fmt.Println("getListenerFd - return err")
@@ -123,7 +123,7 @@ fail:
 }
 
 func SetTCPListenerMD5(l *net.TCPListener, ipAddr, key string) error {
-	fmt.Println("SetTCPListenerMD5 - start ip address:", ipAddr, "key:", key)
+	//fmt.Println("SetTCPListenerMD5 - start ip address:", ipAddr, "key:", key)
 	file, err := getListenerFile(l)
 	if err != nil {
 		fmt.Println("SetTCPListenerMD5 - failed to get listener FD for ip address", ipAddr)

@@ -270,7 +270,7 @@ func GetEventQueryParams(r *http.Request) (evtObj events.EventObject, err error)
 
 func GetEvents(evtQueryObj events.EventObject, pubHdl PubIntf, logger logging.LoggerIntf) (evt []events.EventObject, err error) {
 	qPattern := constructQueryPattern(evtQueryObj)
-	fmt.Println("Pattern Query:", qPattern)
+	//fmt.Println("Pattern Query:", qPattern)
 	keys, err := typeConv.ConvertToStrings(pubHdl.GetAllKeys(qPattern))
 	if err != nil {
 		logger.Err(fmt.Sprintln("Error querying for keys:", err))

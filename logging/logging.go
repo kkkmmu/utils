@@ -26,8 +26,6 @@ package logging
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/garyburd/redigo/redis"
-	nanomsg "github.com/op/go-nanomsg"
 	"infra/sysd/sysdCommonDefs"
 	"log"
 	"log/syslog"
@@ -35,6 +33,9 @@ import (
 	"os"
 	"sysd"
 	"time"
+
+	"github.com/garyburd/redigo/redis"
+	nanomsg "github.com/op/go-nanomsg"
 )
 
 const (
@@ -43,15 +44,24 @@ const (
 )
 
 type LoggerIntf interface {
-	Crit(string) error
-	Err(string) error
-	Warning(string) error
-	Alert(string) error
-	Emerg(string) error
-	Notice(string) error
-	Info(string) error
-	Println(string) error
-	Debug(string) error
+	/*	Crit(string) error
+		Err(string) error
+		Warning(string) error
+		Alert(string) error
+		Emerg(string) error
+		Notice(string) error
+		Info(string) error
+		Println(string) error
+		Debug(string) error*/
+	Crit(...interface{}) error
+	Err(...interface{}) error
+	Warning(...interface{}) error
+	Alert(...interface{}) error
+	Emerg(...interface{}) error
+	Notice(...interface{}) error
+	Info(...interface{}) error
+	Println(...interface{}) error
+	Debug(...interface{}) error
 }
 
 func ConvertLevelStrToVal(str string) sysdCommonDefs.SRDebugLevel {
@@ -199,6 +209,7 @@ func (logger *Writer) SetLevel(level sysdCommonDefs.SRDebugLevel) error {
 	return nil
 }
 
+/*
 func (logger *Writer) Crit(message string) error {
 	if logger.initialized {
 		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.CRIT {
@@ -308,6 +319,216 @@ func (logger *Writer) Write(message string) (int, error) {
 		logger.nullLogger.Println(message)
 	}
 	return 0, nil
+}
+*/
+func (logger *Writer) Crit(message ...interface{}) error {
+	if logger.initialized {
+		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.CRIT {
+			return logger.SysLogger.Crit(fmt.Sprintln(message))
+		}
+	} else if logger.nullLogger != nil {
+		logger.nullLogger.Println(fmt.Sprintln(message))
+	}
+	return nil
+}
+
+func (logger *Writer) Err(message ...interface{}) error {
+	if logger.initialized {
+		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.ERR {
+			return logger.SysLogger.Err(fmt.Sprintln(message))
+		}
+	} else if logger.nullLogger != nil {
+		logger.nullLogger.Println(fmt.Sprintln(message))
+	}
+	return nil
+}
+
+func (logger *Writer) Warning(message ...interface{}) error {
+	if logger.initialized {
+		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.WARN {
+			return logger.SysLogger.Warning(fmt.Sprintln(message))
+		}
+	} else if logger.nullLogger != nil {
+		logger.nullLogger.Println(fmt.Sprintln(message))
+	}
+	return nil
+}
+
+func (logger *Writer) Alert(message ...interface{}) error {
+	if logger.initialized {
+		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.ALERT {
+			return logger.SysLogger.Alert(fmt.Sprintln(message))
+		}
+	} else if logger.nullLogger != nil {
+		logger.nullLogger.Println(fmt.Sprintln(message))
+	}
+	return nil
+}
+
+func (logger *Writer) Emerg(message ...interface{}) error {
+	if logger.initialized {
+		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.EMERG {
+			return logger.SysLogger.Emerg(fmt.Sprintln(message))
+		}
+	} else if logger.nullLogger != nil {
+		logger.nullLogger.Println(fmt.Sprintln(message))
+	}
+	return nil
+}
+
+func (logger *Writer) Notice(message ...interface{}) error {
+	if logger.initialized {
+		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.NOTICE {
+			return logger.SysLogger.Notice(fmt.Sprintln(message))
+		}
+	} else if logger.nullLogger != nil {
+		logger.nullLogger.Println(fmt.Sprintln(message))
+	}
+	return nil
+}
+
+func (logger *Writer) Info(message ...interface{}) error {
+	if logger.initialized {
+		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.INFO {
+			return logger.SysLogger.Info(fmt.Sprintln(message))
+		}
+	} else if logger.nullLogger != nil {
+		logger.nullLogger.Println(fmt.Sprintln(message))
+	}
+	return nil
+}
+
+func (logger *Writer) Println(message ...interface{}) error {
+	if logger.initialized {
+		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.INFO {
+			return logger.SysLogger.Info(fmt.Sprintln(message))
+		}
+	} else if logger.nullLogger != nil {
+		logger.nullLogger.Println(fmt.Sprintln(message))
+	}
+	return nil
+}
+
+func (logger *Writer) Debug(message ...interface{}) error {
+	if logger.initialized {
+		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.DEBUG {
+			return logger.SysLogger.Debug(fmt.Sprintln(message))
+		}
+	} else if logger.nullLogger != nil {
+		logger.nullLogger.Println(fmt.Sprintln(message))
+	}
+	return nil
+}
+
+func (logger *Writer) Write(message string) (int, error) {
+	if logger.initialized {
+		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.TRACE {
+			n, err := logger.SysLogger.Write([]byte(message))
+			return n, err
+		}
+	} else if logger.nullLogger != nil {
+		logger.nullLogger.Println(message)
+	}
+	return 0, nil
+}
+
+func (logger *Writer) Critf(format string, message ...interface{}) error {
+	if logger.initialized {
+		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.CRIT {
+			return logger.SysLogger.Crit(fmt.Sprintf(format, message))
+		}
+	} else if logger.nullLogger != nil {
+		logger.nullLogger.Println(fmt.Sprintf(format, message))
+	}
+	return nil
+}
+
+func (logger *Writer) Errf(format string, message ...interface{}) error {
+	if logger.initialized {
+		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.ERR {
+			return logger.SysLogger.Err(fmt.Sprintf(format, message))
+		}
+	} else if logger.nullLogger != nil {
+		logger.nullLogger.Println(fmt.Sprintf(format, message))
+	}
+	return nil
+}
+
+func (logger *Writer) Warningf(format string, message ...interface{}) error {
+	if logger.initialized {
+		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.WARN {
+			return logger.SysLogger.Warning(fmt.Sprintf(format, message))
+		}
+	} else if logger.nullLogger != nil {
+		logger.nullLogger.Println(fmt.Sprintf(format, message))
+	}
+	return nil
+}
+
+func (logger *Writer) Alertf(format string, message ...interface{}) error {
+	if logger.initialized {
+		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.ALERT {
+			return logger.SysLogger.Alert(fmt.Sprintf(format, message))
+		}
+	} else if logger.nullLogger != nil {
+		logger.nullLogger.Println(fmt.Sprintf(format, message))
+	}
+	return nil
+}
+
+func (logger *Writer) Emergf(format string, message ...interface{}) error {
+	if logger.initialized {
+		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.EMERG {
+			return logger.SysLogger.Emerg(fmt.Sprintf(format, message))
+		}
+	} else if logger.nullLogger != nil {
+		logger.nullLogger.Println(fmt.Sprintf(format, message))
+	}
+	return nil
+}
+
+func (logger *Writer) Noticef(format string, message ...interface{}) error {
+	if logger.initialized {
+		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.NOTICE {
+			return logger.SysLogger.Notice(fmt.Sprintf(format, message))
+		}
+	} else if logger.nullLogger != nil {
+		logger.nullLogger.Println(fmt.Sprintf(format, message))
+	}
+	return nil
+}
+
+func (logger *Writer) Infof(format string, message ...interface{}) error {
+	if logger.initialized {
+		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.INFO {
+			return logger.SysLogger.Info(fmt.Sprintf(format, message))
+		}
+	} else if logger.nullLogger != nil {
+		logger.nullLogger.Println(fmt.Sprintf(format, message))
+	}
+	return nil
+}
+
+func (logger *Writer) Printf(format string, message ...interface{}) error {
+	if logger.initialized {
+		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.INFO {
+			return logger.SysLogger.Info(fmt.Sprintf(format, message))
+		}
+	} else if logger.nullLogger != nil {
+		logger.nullLogger.Println(fmt.Sprintf(format, message))
+	}
+	return nil
+}
+
+func (logger *Writer) Debugf(format string, message ...interface{}) error {
+	if logger.initialized {
+		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.DEBUG {
+			return logger.SysLogger.Debug(fmt.Sprintf(format, message))
+		}
+	} else if logger.nullLogger != nil {
+		logger.nullLogger.Println(fmt.Sprintf(format, message))
+	}
+	return nil
 }
 
 func (logger *Writer) Close() error {
