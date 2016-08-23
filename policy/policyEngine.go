@@ -59,6 +59,9 @@ func (db *PolicyEngineDB) PolicyEngineCheckActionsForEntity(entity PolicyEngineF
 	case policyCommonDefs.PolicyConditionTypeProtocolMatch:
 		policyStmtList = db.ProtocolPolicyListDB[entity.RouteProtocol]
 		break
+	case policyCommonDefs.PolicyConditionTypeNeighborMatch:
+		policyStmtList = db.ProtocolPolicyListDB[entity.Neighbor]
+		break
 	default:
 		db.Logger.Err("Unknown conditonType")
 		return nil
@@ -157,7 +160,8 @@ func (db *PolicyEngineDB) PolicyEngineImplementActions(entity PolicyEngineFilter
 	addActionToList := false
 	switch action.ActionType {
 	case policyCommonDefs.PolicyActionTypeRouteDisposition, policyCommonDefs.PolicyActionTypeRouteRedistribute,
-		policyCommonDefs.PolicyActionTypeNetworkStatementAdvertise, policyCommonDefs.PolicyActionTypeAggregate:
+		policyCommonDefs.PolicyActionTypeNetworkStatementAdvertise, policyCommonDefs.PolicyActionTypeAggregate,
+		policyCommonDefs.PolicyActionTypeRIBIn, policyCommonDefs.PolicyActionTypeRIBOut:
 		if entity.DeletePath == true {
 			db.Logger.Info("action to be reversed", action.ActionType)
 			if db.UndoActionfuncMap[action.ActionType] != nil {
@@ -303,6 +307,19 @@ func (db *PolicyEngineDB) ProtocolMatchConditionfunc(entity PolicyEngineFilterEn
 	}
 	return match
 }
+
+func (db *PolicyEngineDB) NeighborMatchConditionfunc(entity PolicyEngineFilterEntityParams,
+	condition PolicyCondition) (match bool) {
+	db.Logger.Info("NeighborMatchConditionfunc: check if policy neighbor:", condition.ConditionInfo.(string),
+		"matches entity neighbor: ", entity.Neighbor)
+	matchNeighbor := condition.ConditionInfo.(string)
+	if matchNeighbor == entity.Neighbor {
+		db.Logger.Info("Protocol condition matches")
+		match = true
+	}
+	return match
+}
+
 func (db *PolicyEngineDB) ConditionCheckValid(entity PolicyEngineFilterEntityParams, conditionsList []string, policyStmt PolicyStmt) (valid bool) {
 	db.Logger.Info("conditionCheckValid")
 	valid = true

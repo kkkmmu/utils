@@ -305,6 +305,10 @@ func (db *PolicyEngineDB) UpdateConditions(policyStmt PolicyStmt, conditionName 
 		db.Logger.Info("PolicyConditionTypeProtocolMatch")
 		db.UpdateProtocolPolicyTable(condition.ConditionInfo.(string), policyStmt.Name, op)
 		break
+	case policyCommonDefs.PolicyConditionTypeNeighborMatch:
+		db.Logger.Info("PolicyConditionTypeNeighborMatch")
+		db.UpdateProtocolPolicyTable(condition.ConditionInfo.(string), policyStmt.Name, op)
+		break
 	case policyCommonDefs.PolicyConditionTypeDstIpPrefixMatch:
 		db.Logger.Info("PolicyConditionTypeDstIpPrefixMatch")
 		db.UpdatePrefixPolicyTable(condition.ConditionInfo, policyStmt.Name, op)

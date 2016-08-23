@@ -35,6 +35,7 @@ type IPCClientBase struct {
 	Address            string
 	TTransport         thrift.TTransport
 	PtrProtocolFactory *thrift.TBinaryProtocolFactory
+	Enabled            bool
 	IsConnected        bool
 	ApiHandlerMutex    sync.RWMutex
 }

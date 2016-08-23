@@ -58,6 +58,7 @@ type PolicyEngineFilterEntityParams struct {
 	DestNetIp        string //CIDR format
 	NextHopIp        string
 	RouteProtocol    string
+	Neighbor         string
 	CreatePath       bool
 	DeletePath       bool
 	PolicyList       []string
@@ -158,15 +159,20 @@ func (db *PolicyEngineDB) buildPolicyConditionCheckfuncMap() {
 	db.Logger.Info("buildPolicyConditionCheckfuncMap")
 	db.ConditionCheckfuncMap[policyCommonDefs.PolicyConditionTypeDstIpPrefixMatch] = db.DstIpPrefixMatchConditionfunc
 	db.ConditionCheckfuncMap[policyCommonDefs.PolicyConditionTypeProtocolMatch] = db.ProtocolMatchConditionfunc
+	db.ConditionCheckfuncMap[policyCommonDefs.PolicyConditionTypeNeighborMatch] = db.NeighborMatchConditionfunc
 }
 func (db *PolicyEngineDB) buildPolicyValidConditionsForPolicyTypeMap() {
 	db.Logger.Info("buildPolicyValidConditionsForPolicyTypeMap")
-	db.ValidConditionsForPolicyTypeMap["ALL"] = []int{policyCommonDefs.PolicyConditionTypeDstIpPrefixMatch, policyCommonDefs.PolicyConditionTypeProtocolMatch}
+	db.ValidConditionsForPolicyTypeMap["ALL"] = []int{policyCommonDefs.PolicyConditionTypeDstIpPrefixMatch,
+		policyCommonDefs.PolicyConditionTypeProtocolMatch, policyCommonDefs.PolicyConditionTypeNeighborMatch}
 }
 func (db *PolicyEngineDB) buildPolicyValidActionsForPolicyTypeMap() {
 	db.Logger.Info("buildPolicyValidActionsForPolicyTypeMap")
-	db.ValidActionsForPolicyTypeMap["ALL"] = []int{policyCommonDefs.PolicyActionTypeRouteDisposition, policyCommonDefs.PolicyActionTypeRouteRedistribute}
-	db.ValidActionsForPolicyTypeMap["BGP"] = []int{policyCommonDefs.PolicyActionTypeAggregate}
+	db.ValidActionsForPolicyTypeMap["ALL"] = []int{policyCommonDefs.PolicyActionTypeRouteDisposition,
+		policyCommonDefs.PolicyActionTypeRouteRedistribute, policyCommonDefs.PolicyActionTypeRIBIn,
+		policyCommonDefs.PolicyActionTypeRIBOut}
+	db.ValidActionsForPolicyTypeMap["BGP"] = []int{policyCommonDefs.PolicyActionTypeAggregate,
+		policyCommonDefs.PolicyActionTypeRIBIn, policyCommonDefs.PolicyActionTypeRIBOut}
 }
 func NewPolicyEngineDB(logger *logging.Writer) (policyEngineDB *PolicyEngineDB) {
 	policyEngineDB = &PolicyEngineDB{}
@@ -328,6 +334,14 @@ func (db *PolicyEngineDB) PolicyActionType(actionType int) (exportTypeAction boo
 		importTypeAction = true
 		db.Logger.Info("setting importTypeAction true")
 		break
+	case policyCommonDefs.PolicyActionTypeRIBIn:
+		importTypeAction = true
+		db.Logger.Info("setting importTypeAction true")
+		break
+	case policyCommonDefs.PolicyActionTypeRIBOut:
+		exportTypeAction = true
+		db.Logger.Info("setting exportTypeAction true")
+		break
 	default:
 		db.Logger.Err("Unknown action type")
 		break
@@ -350,6 +364,12 @@ func PolicyActionStrToIntType(action string) (actionType int, err error) {
 		break
 	case "Aggregate":
 		actionType = policyCommonDefs.PolicyActionTypeAggregate
+		break
+	case "RIBIn":
+		actionType = policyCommonDefs.PolicyActionTypeRIBIn
+		break
+	case "RIBOut":
+		actionType = policyCommonDefs.PolicyActionTypeRIBOut
 		break
 	default:
 		return -1, errors.New("Unknown ActionType")
