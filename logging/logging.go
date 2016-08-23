@@ -177,15 +177,18 @@ func (logger *Writer) readLogLevelFromDb() error {
 	var err error
 	retryCount := 0
 	ticker := time.NewTicker(DB_CONNECT_TIME_INTERVAL * time.Second)
-	for _ = range ticker.C {
-		retryCount += 1
-		dbHdl, err = redis.Dial("tcp", ":6379")
-		if err != nil {
-			if retryCount%DB_CONNECT_RETRY_LOG_COUNT == 0 {
-				logger.Err(fmt.Sprintln("Failed to dial out to Redis server. Ret    rying connection. Num retries = ", retryCount))
+	dbHdl, err = redis.Dial("tcp", ":6379")
+	if err != nil {
+		for _ = range ticker.C {
+			retryCount += 1
+			dbHdl, err = redis.Dial("tcp", ":6379")
+			if err != nil {
+				if retryCount%DB_CONNECT_RETRY_LOG_COUNT == 0 {
+					logger.Err(fmt.Sprintln("Failed to dial out to Redis server. Ret    rying connection. Num retries = ", retryCount))
+				}
+			} else {
+				break
 			}
-		} else {
-			break
 		}
 	}
 
@@ -435,7 +438,7 @@ func (logger *Writer) Write(message string) (int, error) {
 func (logger *Writer) Critf(format string, message ...interface{}) error {
 	if logger.initialized {
 		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.CRIT {
-			return logger.SysLogger.Crit(fmt.Sprintf(format, message))
+			return logger.SysLogger.Crit(fmt.Sprintf(format, message...))
 		}
 	} else if logger.nullLogger != nil {
 		logger.nullLogger.Println(fmt.Sprintf(format, message))
@@ -446,7 +449,7 @@ func (logger *Writer) Critf(format string, message ...interface{}) error {
 func (logger *Writer) Errf(format string, message ...interface{}) error {
 	if logger.initialized {
 		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.ERR {
-			return logger.SysLogger.Err(fmt.Sprintf(format, message))
+			return logger.SysLogger.Err(fmt.Sprintf(format, message...))
 		}
 	} else if logger.nullLogger != nil {
 		logger.nullLogger.Println(fmt.Sprintf(format, message))
@@ -457,7 +460,7 @@ func (logger *Writer) Errf(format string, message ...interface{}) error {
 func (logger *Writer) Warningf(format string, message ...interface{}) error {
 	if logger.initialized {
 		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.WARN {
-			return logger.SysLogger.Warning(fmt.Sprintf(format, message))
+			return logger.SysLogger.Warning(fmt.Sprintf(format, message...))
 		}
 	} else if logger.nullLogger != nil {
 		logger.nullLogger.Println(fmt.Sprintf(format, message))
@@ -468,7 +471,7 @@ func (logger *Writer) Warningf(format string, message ...interface{}) error {
 func (logger *Writer) Alertf(format string, message ...interface{}) error {
 	if logger.initialized {
 		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.ALERT {
-			return logger.SysLogger.Alert(fmt.Sprintf(format, message))
+			return logger.SysLogger.Alert(fmt.Sprintf(format, message...))
 		}
 	} else if logger.nullLogger != nil {
 		logger.nullLogger.Println(fmt.Sprintf(format, message))
@@ -479,7 +482,7 @@ func (logger *Writer) Alertf(format string, message ...interface{}) error {
 func (logger *Writer) Emergf(format string, message ...interface{}) error {
 	if logger.initialized {
 		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.EMERG {
-			return logger.SysLogger.Emerg(fmt.Sprintf(format, message))
+			return logger.SysLogger.Emerg(fmt.Sprintf(format, message...))
 		}
 	} else if logger.nullLogger != nil {
 		logger.nullLogger.Println(fmt.Sprintf(format, message))
@@ -490,7 +493,7 @@ func (logger *Writer) Emergf(format string, message ...interface{}) error {
 func (logger *Writer) Noticef(format string, message ...interface{}) error {
 	if logger.initialized {
 		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.NOTICE {
-			return logger.SysLogger.Notice(fmt.Sprintf(format, message))
+			return logger.SysLogger.Notice(fmt.Sprintf(format, message...))
 		}
 	} else if logger.nullLogger != nil {
 		logger.nullLogger.Println(fmt.Sprintf(format, message))
@@ -501,7 +504,7 @@ func (logger *Writer) Noticef(format string, message ...interface{}) error {
 func (logger *Writer) Infof(format string, message ...interface{}) error {
 	if logger.initialized {
 		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.INFO {
-			return logger.SysLogger.Info(fmt.Sprintf(format, message))
+			return logger.SysLogger.Info(fmt.Sprintf(format, message...))
 		}
 	} else if logger.nullLogger != nil {
 		logger.nullLogger.Println(fmt.Sprintf(format, message))
@@ -512,7 +515,7 @@ func (logger *Writer) Infof(format string, message ...interface{}) error {
 func (logger *Writer) Printf(format string, message ...interface{}) error {
 	if logger.initialized {
 		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.INFO {
-			return logger.SysLogger.Info(fmt.Sprintf(format, message))
+			return logger.SysLogger.Info(fmt.Sprintf(format, message...))
 		}
 	} else if logger.nullLogger != nil {
 		logger.nullLogger.Println(fmt.Sprintf(format, message))
@@ -523,7 +526,7 @@ func (logger *Writer) Printf(format string, message ...interface{}) error {
 func (logger *Writer) Debugf(format string, message ...interface{}) error {
 	if logger.initialized {
 		if logger.GlobalLogging && logger.MyLogLevel >= sysdCommonDefs.DEBUG {
-			return logger.SysLogger.Debug(fmt.Sprintf(format, message))
+			return logger.SysLogger.Debug(fmt.Sprintf(format, message...))
 		}
 	} else if logger.nullLogger != nil {
 		logger.nullLogger.Println(fmt.Sprintf(format, message))

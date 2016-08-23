@@ -57,7 +57,7 @@ func NewFSDBClient(logger *logging.Writer) *FSDBClient {
 	return &FSDBClient{
 		logger:     logger,
 		dbUtil:     dbutils.NewDBUtil(logger),
-		objStateCh: make(chan objInfo, 10000),
+		objStateCh: make(chan objInfo, 30000),
 	}
 }
 
@@ -105,9 +105,9 @@ func (fs *FSDBClient) DeleteAllObjects(obj objects.ConfigObj) error {
 	return nil
 }
 
-func (fs *FSDBClient) addObjToDB(obj objects.ConfigObj) error {
+func (fs *FSDBClient) addObjToDB(obj objects.ConfigObj) (err error) {
 	//fs.logger.Info("addObjToDB object %s", obj.GetKey())
-	err := fs.dbUtil.StoreObjectInDb(obj)
+	err = fs.dbUtil.StoreObjectInDb(obj)
 	if err != nil {
 		fs.logger.Err("Failed to add state object %s to DB with error %s", obj.GetKey(), err)
 		return err
@@ -116,9 +116,9 @@ func (fs *FSDBClient) addObjToDB(obj objects.ConfigObj) error {
 	return nil
 }
 
-func (fs *FSDBClient) delObjToDB(obj objects.ConfigObj) error {
+func (fs *FSDBClient) delObjToDB(obj objects.ConfigObj) (err error) {
 	//fs.logger.Info("delObjToDB object %s", obj.GetKey())
-	err := fs.dbUtil.DeleteObjectFromDb(obj)
+	err = fs.dbUtil.DeleteObjectFromDb(obj)
 	if err != nil {
 		fs.logger.Err("Failed to delete state object %s from DB with error", obj.GetKey(), err)
 		return err

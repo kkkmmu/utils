@@ -148,3 +148,15 @@ func (asicdClientMgr *OvsAsicdClientMgr) BPDUGuardDetected(ifindex int32, enable
 func (asicdClientMgr *OvsAsicdClientMgr) GetSwitchMAC(paramsPath string) string {
 	return "00:00:00:00:00:00"
 }
+
+func (asicdClientMgr *OvsAsicdClientMgr) CreateLag(hashType int32, ports string) (hwAggId int32, err error) {
+	return -1, err
+}
+
+func (asicdClientMgr *OvsAsicdClientMgr) DeleteLag(hwAggId int32) (err error) {
+	return err
+}
+
+func (asicdClientMgr *OvsAsicdClientMgr) UpdateLag(ifIndex, hashType int32, ports string) (err error) {
+	return err
+}

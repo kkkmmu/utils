@@ -83,3 +83,11 @@ func (clnt *IPCClientBase) CloseIPCHandles() error {
 	clnt.IsConnected = false
 	return nil
 }
+
+func (clnt *IPCClientBase) PreConfigValidation(obj objects.ConfigObj) error {
+	return nil
+}
+
+func (clnt *IPCClientBase) PostConfigProcessing(obj objects.ConfigObj) error {
+	return nil
+}

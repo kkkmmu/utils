@@ -27,16 +27,16 @@ package policy
 import (
 	//"reflect"
 	"sort"
-	"strconv"
-	"strings"
+	//	"strconv"
+	//	"strings"
 	"utils/netUtils"
 	"utils/patriciaDB"
 	"utils/policy/policyCommonDefs"
 	//	"utils/commonDefs"
-	"net"
+	//"net"
 	//	"asicdServices"
 	//	"asicd/asicdConstDefs"
-	"bytes"
+	//"bytes"
 	//  "database/sql"
 )
 
@@ -107,7 +107,7 @@ func (db *PolicyEngineDB) PolicyEngineUndoActionsPolicyStmt(policy Policy, polic
 		/*
 			actionItem := db.PolicyActionsDB.Get(patriciaDB.Prefix(policyStmt.Actions[i]))
 			if actionItem == nil {
-				db.Logger.Info(fmt.Sprintln("Did not find action ", conditionsAndActionsList.ActionList[i], " in the action database")
+				db.Logger.Info("Did not find action ", conditionsAndActionsList.ActionList[i], " in the action database")
 				continue
 			}
 			actionInfo := actionItem.(PolicyAction)
@@ -182,55 +182,57 @@ func (db *PolicyEngineDB) PolicyEngineImplementActions(entity PolicyEngineFilter
 }
 
 /*
-func (db *PolicyEngineDB) FindPrefixMatch(ipAddr string, ipPrefix patriciaDB.Prefix, policyName string) (match bool) {
-	db.Logger.Info(fmt.Sprintln("Prefix match policy ", policyName))
+func (db *PolicyEngineDB) FindPrefixMatch(ipAddr string, ipPrefix patriciaDB.Prefix, condition PolicyCondition) (match bool) {
+	db.Logger.Info("Prefix match policy ", policyName)
 	policyListItem := db.PrefixPolicyListDB.GetLongestPrefixNode(ipPrefix)
 	if policyListItem == nil {
-		db.Logger.Info(fmt.Sprintln("intf stored at prefix ", ipPrefix, " is nil"))
+		db.Logger.Info("intf stored at prefix ", ipPrefix, " is nil")
 		return false
 	}
 	if policyListItem != nil && reflect.TypeOf(policyListItem).Kind() != reflect.Slice {
-		db.Logger.Err(fmt.Sprintln("Incorrect data type for this prefix "))
+		db.Logger.Err("Incorrect data type for this prefix ")
 		return false
 	}
 	policyListSlice := reflect.ValueOf(policyListItem)
 	for idx := 0; idx < policyListSlice.Len(); idx++ {
 		prefixPolicyListInfo := policyListSlice.Index(idx).Interface().(PrefixPolicyListInfo)
 		if prefixPolicyListInfo.policyName != policyName {
-			db.Logger.Info(fmt.Sprintln("Found a potential match for this prefix but the policy ", policyName, " is not what we are looking for"))
+			db.Logger.Info("Found a potential match for this prefix but the policy ", policyName, " is not what we are looking for")
 			continue
 		}
 		if prefixPolicyListInfo.lowRange == -1 && prefixPolicyListInfo.highRange == -1 {
-			db.Logger.Info(fmt.Sprintln("Looking for exact match condition for prefix ", prefixPolicyListInfo.ipPrefix))
+			db.Logger.Info("Looking for exact match condition for prefix ", prefixPolicyListInfo.ipPrefix)
 			if bytes.Equal(ipPrefix, prefixPolicyListInfo.ipPrefix) {
-				db.Logger.Info(fmt.Sprintln(" Matched the prefix"))
+				db.Logger.Info(" Matched the prefix")
 				return true
 			} else {
-				db.Logger.Info(fmt.Sprintln(" Did not match the exact prefix"))
+				db.Logger.Info(" Did not match the exact prefix")
 				return false
 			}
 		}
 		tempSlice := strings.Split(ipAddr, "/")
 		maskLen, err := strconv.Atoi(tempSlice[1])
 		if err != nil {
-			db.Logger.Err(fmt.Sprintln("err getting maskLen"))
+			db.Logger.Err("err getting maskLen")
 			return false
 		}
-		db.Logger.Info(fmt.Sprintln("Mask len = ", maskLen))
+		db.Logger.Info("Mask len = ", maskLen)
 		if maskLen < prefixPolicyListInfo.lowRange || maskLen > prefixPolicyListInfo.highRange {
-			db.Logger.Info(fmt.Sprintln("Mask range of the route ", maskLen, " not within the required mask range:", prefixPolicyListInfo.lowRange, "..", prefixPolicyListInfo.highRange))
+			db.Logger.Info("Mask range of the route ", maskLen, " not within the required mask range:", prefixPolicyListInfo.lowRange, "..", prefixPolicyListInfo.highRange)
 			return false
 		} else {
-			db.Logger.Info(fmt.Sprintln("Mask range of the route ", maskLen, " within the required mask range:", prefixPolicyListInfo.lowRange, "..", prefixPolicyListInfo.highRange))
+			db.Logger.Info("Mask range of the route ", maskLen, " within the required mask range:", prefixPolicyListInfo.lowRange, "..", prefixPolicyListInfo.highRange)
 			return true
 		}
 	}
 	return match
-}*/
-func (db *PolicyEngineDB) FindPrefixMatch(ipAddr string, ipPrefix patriciaDB.Prefix, condition PolicyCondition) (match bool) {
-	db.Logger.Info("ipAddr : ", ipAddr, " ipPrefix: ", ipPrefix, " condition.IpPrefix: ", condition.ConditionInfo.(MatchPrefixConditionInfo).IpPrefix, " conditionInfo,MaskLengthRange: ", condition.ConditionInfo.(MatchPrefixConditionInfo).Prefix.IpPrefix)
+}
+*/
+func (db *PolicyEngineDB) FindPrefixMatch(ipAddr string, condition PolicyCondition) (match bool) {
+	db.Logger.Info("ipAddr : ", ipAddr, " condition.IpPrefix: ", condition.ConditionInfo.(MatchPrefixConditionInfo).IpPrefix, " conditionInfo,MaskLengthRange: ", condition.ConditionInfo.(MatchPrefixConditionInfo).Prefix.IpPrefix)
 	conditionInfo := condition.ConditionInfo.(MatchPrefixConditionInfo)
-	if conditionInfo.LowRange == -1 && conditionInfo.HighRange == -1 {
+	match = netUtils.CheckIfInRange(ipAddr, conditionInfo.Prefix.IpPrefix, conditionInfo.LowRange, conditionInfo.HighRange)
+	/*	if conditionInfo.LowRange == -1 && conditionInfo.HighRange == -1 {
 		_, ipNet, err := net.ParseCIDR(condition.ConditionInfo.(MatchPrefixConditionInfo).Prefix.IpPrefix)
 		if err != nil {
 			return false
@@ -250,31 +252,43 @@ func (db *PolicyEngineDB) FindPrefixMatch(ipAddr string, ipPrefix patriciaDB.Pre
 			db.Logger.Info(" Did not match the exact prefix")
 			return false
 		}
-	}
-	tempSlice := strings.Split(ipAddr, "/")
-	maskLen, err := strconv.Atoi(tempSlice[1])
+	}*/
+	/*	tempSlice := strings.Split(ipAddr, "/")
+		maskLen, err := strconv.Atoi(tempSlice[1])
+		if err != nil {
+			db.Logger.Err("err getting maskLen")
+			return false
+		}
+		db.Logger.Info("Mask len = ", maskLen)
+		if maskLen < conditionInfo.LowRange || maskLen > conditionInfo.HighRange {
+			db.Logger.Info("Mask range of the route ", maskLen, " not within the required mask range:", conditionInfo.LowRange, "-", conditionInfo.HighRange)
+			return false
+		} else {
+			db.Logger.Info("Mask range of the route ", maskLen, " within the required mask range:", conditionInfo.LowRange, "-", conditionInfo.HighRange)
+			return true
+		}*/
+	/*baseIp, _, err := net.ParseCIDR(condition.ConditionInfo.(MatchPrefixConditionInfo).Prefix.IpPrefix)
 	if err != nil {
-		db.Logger.Err("err getting maskLen")
+		db.Logger.Info("Invalid condition ip:", condition.ConditionInfo.(MatchPrefixConditionInfo).Prefix.IpPrefix)
 		return false
 	}
-	db.Logger.Info("Mask len = ", maskLen)
-	if maskLen < conditionInfo.LowRange || maskLen > conditionInfo.HighRange {
-		db.Logger.Info("Mask range of the route ", maskLen, " not within the required mask range:", conditionInfo.LowRange, "-", conditionInfo.HighRange)
+	testIp, _, err := net.ParseCIDR(ipAddr)
+	if err != nil {
+		db.Logger.Err("Invalid ipAddr:", ipAddr)
 		return false
-	} else {
-		db.Logger.Info("Mask range of the route ", maskLen, " within the required mask range:", conditionInfo.LowRange, "-", conditionInfo.HighRange)
-		return true
 	}
+	match = netUtils.CheckIfInRange(testIp.String(), baseIp.String(), conditionInfo.LowRange, conditionInfo.HighRange)*/
 	return match
 }
+
 func (db *PolicyEngineDB) DstIpPrefixMatchConditionfunc(entity PolicyEngineFilterEntityParams, condition PolicyCondition) (match bool) {
 	db.Logger.Info("dstIpPrefixMatchConditionfunc")
-	ipPrefix, err := netUtils.GetNetworkPrefixFromCIDR(entity.DestNetIp)
+	/*ipPrefix, err := netUtils.GetNetworkPrefixFromCIDR(entity.DestNetIp)
 	if err != nil {
 		db.Logger.Info("Invalid ipPrefix for the route ", entity.DestNetIp)
 		return false
-	}
-	match = db.FindPrefixMatch(entity.DestNetIp, ipPrefix, condition)
+	}*/
+	match = db.FindPrefixMatch(entity.DestNetIp, condition)
 	if match {
 		db.Logger.Info("Found a match for this prefix")
 	}
@@ -578,13 +592,13 @@ func (db *PolicyEngineDB) PolicyEngineTraverseAndApplyPolicy(info ApplyPolicyInf
 		db.TraverseAndApplyPolicyFunc(info, db.PolicyEngineApplyForEntity)
 	}
 	/*	if policy.ExportPolicy || policy.ImportPolicy {
-			db.Logger.Info(fmt.Sprintln("Applying import/export policy to all routes"))
+			db.Logger.Info("Applying import/export policy to all routes"))
 			if db.TraverseAndApplyPolicyFunc != nil {
-				db.Logger.Info(fmt.Sprintln("Calling TraverseAndApplyPolicyFunc function"))
+				db.Logger.Info("Calling TraverseAndApplyPolicyFunc function"))
 				db.TraverseAndApplyPolicyFunc(policy, db.PolicyEngineApplyForEntity)
 			}
 		} else if policy.GlobalPolicy {
-			db.Logger.Info(fmt.Sprintln("Need to apply global policy"))
+			db.Logger.Info("Need to apply global policy"))
 			db.PolicyEngineApplyGlobalPolicy(policy)
 		}*/
 }

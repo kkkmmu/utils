@@ -151,3 +151,15 @@ func (asicdClientMgr *MockAsicdClientMgr) BPDUGuardDetected(ifindex int32, enabl
 func (asicdClientMgr *MockAsicdClientMgr) GetSwitchMAC(paramsPath string) string {
 	return "00:00:00:00:00:00"
 }
+
+func (asicdClientMgr *MockAsicdClientMgr) CreateLag(hashType int32, ports string) (hwAggId int32, err error) {
+	return -1, err
+}
+
+func (asicdClientMgr *MockAsicdClientMgr) DeleteLag(hwAggId int32) (err error) {
+	return err
+}
+
+func (asicdClientMgr *MockAsicdClientMgr) UpdateLag(ifIndex, hashType int32, ports string) (err error) {
+	return err
+}

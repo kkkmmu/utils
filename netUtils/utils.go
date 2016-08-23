@@ -90,7 +90,20 @@ func IsZeros(p net.IP) bool {
 	}
 	return true
 }
-
+func IsZerosIPString(ipAddr string) (bool, error) {
+	ip, err := GetIP(ipAddr)
+	if err != nil {
+		fmt.Println("invalid IP address")
+		return false, errors.New("Invalid IP address")
+	}
+	if IsIPv4Mask(ip) {
+		return IsZeros(ip[12:15]), nil
+	} else {
+		return IsZeros(ip), nil
+	}
+	//fmt.Println("ip:", ip, "len(ip):", len(ip), "ip[12:15]:", ip[12:15], " net.IP(ipAddr):", net.IP(ipAddr))
+	return IsZeros(ip), nil
+}
 func IsIPv4Mask(mask net.IP) bool {
 	if IsZeros(mask[0:10]) &&
 		mask[10] == 0xff &&
@@ -153,4 +166,83 @@ func GetCIDR(ipAddr string, mask string) (addr string, err error) {
 	}
 	addr = (destNetIpAddr.Mask(net.IPMask(maskIP))).String() + "/" + strconv.Itoa(prefixLen)
 	return addr, err
+}
+func CheckIfInRange(testIPAddr, ipAddr string, lowPrefixLen int, highPrefixLen int) bool {
+	//fmt.Println("testIPAddr:", testIPAddr, " ipAddr:", ipAddr, " lowPrefixLen:", lowPrefixLen, " highPrefixLen:", highPrefixLen)
+	//testAddr := net.ParseIP(testIPAddr)
+	testAddr, _, err := net.ParseCIDR(testIPAddr)
+	if err != nil {
+		fmt.Println("error parsing address:", testIPAddr)
+		return false
+	}
+	if lowPrefixLen == -1 && highPrefixLen == -1 {
+		_, cidrnet, err := net.ParseCIDR(ipAddr)
+		if err != nil {
+			fmt.Println("Error parsing cidr addr ", ipAddr)
+			return false
+		}
+		if cidrnet.Contains(testAddr) == true {
+			//fmt.Println(cidrnet, " contains ip:", testAddr)
+			return true
+		} else {
+			fmt.Println(cidrnet, " does not contain ip:", testAddr)
+			return false
+		}
+	}
+	baseAddr, _, err := net.ParseCIDR(ipAddr)
+	if err != nil {
+		fmt.Println("error parsing address:", ipAddr)
+		return false
+	}
+	for idx := lowPrefixLen; idx <= highPrefixLen; idx++ {
+		networkAddr := baseAddr.String() + "/" + strconv.Itoa(idx)
+		_, cidrnet, err := net.ParseCIDR(networkAddr)
+		if err != nil {
+			fmt.Println("Error parsing cidr addr ", networkAddr)
+			return false
+		}
+		if cidrnet.Contains(testAddr) == true {
+			//fmt.Println(cidrnet, " contains ip:", testAddr)
+			return true
+		}
+	}
+	return false
+}
+
+func IsIPv6Addr(ipAddr string) bool {
+	ip, _, err := net.ParseCIDR(ipAddr)
+	if err != nil {
+		ip = net.ParseIP(ipAddr)
+		if ip == nil {
+			return false
+		}
+	}
+	ip1 := ip.To4()
+	if ip1 == nil {
+		return true
+	}
+	ip2 := ip.To16()
+	if len(ip1) == len(ip2) {
+		return true
+	}
+	return false
+}
+
+func IsIPv4Addr(ipAddr string) bool {
+	ip, _, err := net.ParseCIDR(ipAddr)
+	if err != nil {
+		ip = net.ParseIP(ipAddr)
+		if ip == nil {
+			return false
+		}
+	}
+	ip1 := ip.To4()
+	if ip1 == nil {
+		return false
+	}
+	ip2 := ip.To16()
+	if len(ip1) != len(ip2) {
+		return true
+	}
+	return false
 }

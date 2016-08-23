@@ -55,3 +55,21 @@ func GetIfTypeName(ifType int) string {
 const (
 	MAX_JSON_LENGTH = 4096
 )
+
+const (
+	// system wide common notifications
+	_ = iota
+	NOTIFY_IPV6_NEIGHBOR_CREATE
+	NOTIFY_IPV6_NEIGHBOR_DELETE
+)
+
+// commond object for Neighbor Notifications
+type Ipv6NeighborNotification struct {
+	IpAddr  string
+	IfIndex int32
+}
+
+type NdpNotification struct {
+	MsgType uint8
+	Msg     []byte
+}

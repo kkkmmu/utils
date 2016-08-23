@@ -29,6 +29,15 @@ import (
 	"testing"
 )
 
+type IPRange struct {
+	testAddr      string
+	baseAddr      string
+	lowPrefixLen  int
+	highPrefixLen int
+}
+
+var IPRangeData []IPRange
+
 func IPAddrStringToU8List(ipAddr string) []uint8 {
 	ip := net.ParseIP(ipAddr)
 	if ip == nil {
@@ -36,7 +45,22 @@ func IPAddrStringToU8List(ipAddr string) []uint8 {
 	}
 	return ip
 }
-
+func TestInitNetUtils(t *testing.T) {
+	IPRangeData = make([]IPRange, 0)
+	IPRangeData = append(IPRangeData, IPRange{"192.168.1.1/31", "192.168.1.0/24", 24, 32})
+	IPRangeData = append(IPRangeData, IPRange{"192.168.2.1/31", "192.168.1.0/24", 26, 32})
+	IPRangeData = append(IPRangeData, IPRange{"192.168.2.1/31", "192.168.0.0/16", 16, 32})
+	IPRangeData = append(IPRangeData, IPRange{"192.167.2.1/31", "192.168.0.0/16", 16, 32})
+	IPRangeData = append(IPRangeData, IPRange{"192.168.1.1/31", "200.1.1.0", 24, 32})
+	IPRangeData = append(IPRangeData, IPRange{"192.168.0.1/31", "192.168.0.0/26", -1, -1})
+	IPRangeData = append(IPRangeData, IPRange{"2003::11:1:10:1/127", "5001:6000:7000::0/48", 48, 128})
+	IPRangeData = append(IPRangeData, IPRange{"2003::11:1:10:1/127", "2003:11:1::0/64", 64, 128})
+	IPRangeData = append(IPRangeData, IPRange{"2003::11:1:10:1/127", "2003::0/64", 64, 128})
+	IPRangeData = append(IPRangeData, IPRange{"5001::11:1:10:1/127", "5001:6000:7000::0", 48, 128})
+	IPRangeData = append(IPRangeData, IPRange{"5001:6000:7000::11:1:10:1/127", "5001:6000:7000::0/48", 48, 128})
+	IPRangeData = append(IPRangeData, IPRange{"2001::172:16:0:29/127", "2001::172:16:0:0/96", -1, -1})
+	IPRangeData = append(IPRangeData, IPRange{"2000::192:16:0:29/127", "2000::192:16:0:0/96", -1, -1})
+}
 func TestGetNetworkPrefix(t *testing.T) {
 	fmt.Println("****TestGetNetworkPrefix****")
 	ip := "10.1.10.1"
@@ -55,6 +79,7 @@ func TestGetPrefixLen(t *testing.T) {
 		fmt.Println("netIP invalid")
 	}
 	prefixLen, err := GetPrefixLen(netIP)
+	fmt.Println("netIp:", netIP)
 	fmt.Println("prefixLen:", prefixLen, " err:", err, " for ip:", ip)
 
 	ip = "0.0.0.0"
@@ -65,12 +90,24 @@ func TestGetPrefixLen(t *testing.T) {
 	prefixLen, err = GetPrefixLen(netIP)
 	fmt.Println("prefixLen:", prefixLen, " err:", err, " for ip:", ip)
 
-	ip = "255.255.255.0"
+	ip = "255.254.0.0"
 	parsedIP := IPAddrStringToU8List(ip)
 	fmt.Println("parsedIP:", parsedIP, " for ip:", ip)
 	prefixLen, err = GetPrefixLen(parsedIP)
 	fmt.Println("prefixLen:", prefixLen, " err:", err, " for ip:", ip)
-	fmt.Println("**************************")
+
+	ip = "255.254.0.0"
+	prefixLen, err = GetPrefixLen(net.IP(ip))
+	fmt.Println("prefixLen:", prefixLen, " err:", err, " for ip:", ip)
+
+	ip = "11.1.10.2"
+	netIP, err = GetIP(ip)
+	if err != nil {
+		fmt.Println("netIP invalid")
+	}
+	fmt.Println("netIp:", netIP)
+	prefixLen, err = GetPrefixLen(netIP)
+	fmt.Println("prefixLen:", prefixLen, " err:", err, " for ip:", ip)
 }
 
 func TestGetNetworkPrefixFromCIDR(t *testing.T) {
@@ -87,5 +124,71 @@ func TestGetNetworkPrefixFromCIDR(t *testing.T) {
 	ip = "fe80::/64"
 	prefix, err = GetNetworkPrefixFromCIDR(ip)
 	fmt.Println("prefix:", prefix, " err:", err, " for ip:", ip)
+	ip = "80.16.16.16/32"
+	prefix, err = GetNetworkPrefixFromCIDR(ip)
+	fmt.Println("prefix:", prefix, " err:", err, " for ip:", ip)
+	ip = "5010:1010::/32"
+	prefix, err = GetNetworkPrefixFromCIDR(ip)
+	fmt.Println("prefix:", prefix, " err:", err, " for ip:", ip)
 	fmt.Println("****************")
+}
+
+func TestCheckIfInRange(t *testing.T) {
+	fmt.Println("****TestCheckIfInRange()****")
+	for _, data := range IPRangeData {
+		fmt.Println("match result for ", data, CheckIfInRange(data.testAddr, data.baseAddr, data.lowPrefixLen, data.highPrefixLen))
+	}
+	fmt.Println("****************************")
+}
+func TestIsZeroesIPString(t *testing.T) {
+	fmt.Println("****TestIsZeroesIPString()****")
+	ipAddr := "0.0.0.0"
+	isZeroes, err := IsZerosIPString(ipAddr)
+	fmt.Println("isZeroes:", isZeroes, " err:", err, " for ipAddr:", ipAddr)
+	ipAddr = "10.10.10.10"
+	isZeroes, err = IsZerosIPString(ipAddr)
+	fmt.Println("isZeroes:", isZeroes, " err:", err, " for ipAddr:", ipAddr)
+	ipAddr = "0:0:0:0:0:0:0:0"
+	isZeroes, err = IsZerosIPString(ipAddr)
+	fmt.Println("isZeroes:", isZeroes, " err:", err, " for ipAddr:", ipAddr)
+	fmt.Println("*******************************")
+}
+
+func TestCheckIPv4Address(t *testing.T) {
+	ip := "10.1.10.1/24"
+	fmt.Println("****TestCheckIPv4Address()****")
+	if IsIPv4Addr(ip) == false {
+		t.Error(ip, "is ipv4 address")
+	}
+	if IsIPv6Addr(ip) == true {
+		t.Error(ip, "is not ipv6 address")
+	}
+
+	if IsIPv4Addr("10.1.10.20") != true {
+		t.Error("10.1.10.20 should fail the check")
+	}
+
+	if IsIPv6Addr("10.1.10.20") == true {
+		t.Error("10.1.10.20 is ipv4 address not ipv6")
+	}
+	fmt.Println("****************************")
+}
+
+func TestCheckIPv6Address(t *testing.T) {
+	ip := "2003::2/64"
+	fmt.Println("****TestCheckIPv6Address()****")
+	if IsIPv6Addr(ip) == false {
+		t.Error(ip, "is ipv6 address")
+	}
+
+	if IsIPv4Addr(ip) == true {
+		t.Error(ip, "is not ipv4 address")
+	}
+	if IsIPv6Addr("2003::2") != true {
+		t.Error("2003::2 should fail the check")
+	}
+	if IsIPv4Addr("2003::2") == true {
+		t.Error("2003::2 is ipv6 address not ipv4")
+	}
+	fmt.Println("****************************")
 }

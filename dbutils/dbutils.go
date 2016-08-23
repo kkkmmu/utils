@@ -27,8 +27,11 @@ import (
 	"errors"
 	"fmt"
 	"github.com/garyburd/redigo/redis"
+	"github.com/nu7hatch/gouuid"
+	"models/events"
 	"models/objects"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 	"utils/logging"
@@ -50,7 +53,7 @@ func (e DBNotConnectedError) Error() string {
 
 type DBUtil struct {
 	redis.Conn
-	logger  *logging.Writer
+	logger  logging.LoggerIntf
 	network string
 	address string
 	DbLock  sync.RWMutex
@@ -64,17 +67,25 @@ type DBIntf interface {
 	GetObjectFromDb(objects.ConfigObj, string) (objects.ConfigObj, error)
 	GetKey(objects.ConfigObj) string
 	GetAllObjFromDb(objects.ConfigObj) ([]objects.ConfigObj, error)
-	CompareObjectsAndDiff(objects.ConfigObj, map[string]bool, objects.ConfigObj)
-	UpdateObjectInDb(objects.ConfigObj, objects.ConfigObj, []bool)
+	CompareObjectsAndDiff(objects.ConfigObj, map[string]bool, objects.ConfigObj) ([]bool, error)
+	UpdateObjectInDb(objects.ConfigObj, objects.ConfigObj, []bool) error
 	MergeDbAndConfigObj(objects.ConfigObj, objects.ConfigObj, []bool) (objects.ConfigObj, error)
 	GetBulkObjFromDb(obj objects.ConfigObj, startIndex, count int64) (error, int64, int64, bool, []objects.ConfigObj)
 	Publish(string, interface{}, interface{})
 	StoreValInDb(interface{}, interface{}, interface{}) error
 	GetAllKeys(interface{}) (interface{}, error)
 	GetValFromDB(key interface{}, field interface{}) (val interface{}, err error)
+	StoreEventObjectInDb(events.EventObj) error
+	GetEventObjectFromDb(events.EventObj, string) (events.EventObj, error)
+	GetAllEventObjFromDb(events.EventObj) ([]events.EventObj, error)
+	MergeDbAndConfigObjForPatchUpdate(objects.ConfigObj, objects.ConfigObj, []objects.PatchOpInfo) (objects.ConfigObj, []bool, error)
+	StoreUUIDToObjKeyMap(objKey string) (string, error)
+	DeleteUUIDToObjKeyMap(uuid, objKey string) error
+	GetUUIDFromObjKey(objKey string) (string, error)
+	GetObjKeyFromUUID(uuid string) (string, error)
 }
 
-func NewDBUtil(logger *logging.Writer) *DBUtil {
+func NewDBUtil(logger logging.LoggerIntf) *DBUtil {
 	return &DBUtil{
 		logger:  logger,
 		network: "tcp",
@@ -132,7 +143,24 @@ func (db *DBUtil) DeleteObjectFromDb(obj objects.ConfigObj) error {
 	db.DbLock.Lock()
 	return obj.DeleteObjectFromDb(db.Conn)
 }
-
+func (db *DBUtil) DeleteObjectWithKeyFromDb(key interface{}) error {
+	if db.Conn == nil {
+		return DBNotConnectedError{db.network, db.address}
+	}
+	list, err := redis.Strings(db.Do("KEYS", key))
+	if err != nil {
+		fmt.Println("Failed to get all object keys from db for key", key, " error:")
+		return err
+	}
+	for _, k := range list {
+		_, err = db.Do("DEL", k)
+		if err != nil {
+			fmt.Println("Failed to delete obj from DB for key", k, " error:", err)
+			return err
+		}
+	}
+	return nil
+}
 func (db *DBUtil) GetObjectFromDb(obj objects.ConfigObj, objKey string) (objects.ConfigObj, error) {
 	if db.Conn == nil {
 		return obj, DBNotConnectedError{db.network, db.address}
@@ -182,6 +210,12 @@ func (db *DBUtil) MergeDbAndConfigObj(obj, dbObj objects.ConfigObj, attrSet []bo
 	return obj.MergeDbAndConfigObj(dbObj, attrSet)
 }
 
+func (db *DBUtil) MergeDbAndConfigObjForPatchUpdate(obj, dbObj objects.ConfigObj, patchInfo []objects.PatchOpInfo) (objects.ConfigObj, []bool, error) {
+	defer db.DbLock.Unlock()
+	db.DbLock.Lock()
+	return obj.MergeDbAndConfigObjForPatchUpdate(dbObj, patchInfo)
+}
+
 func (db *DBUtil) GetBulkObjFromDb(obj objects.ConfigObj, startIndex, count int64) (error, int64, int64, bool,
 	[]objects.ConfigObj) {
 	if db.Conn == nil {
@@ -198,6 +232,33 @@ func (db *DBUtil) Publish(op string, channel interface{}, msg interface{}) {
 		db.DbLock.Lock()
 		db.Do(op, channel, msg)
 	}
+}
+
+func (db *DBUtil) StoreEventObjectInDb(obj events.EventObj) error {
+	if db.Conn == nil {
+		return DBNotConnectedError{db.network, db.address}
+	}
+	defer db.DbLock.Unlock()
+	db.DbLock.Lock()
+	return obj.StoreObjectInDb(db.Conn)
+}
+
+func (db *DBUtil) GetEventObjectFromDb(obj events.EventObj, objKey string) (events.EventObj, error) {
+	if db.Conn == nil {
+		return obj, DBNotConnectedError{db.network, db.address}
+	}
+	defer db.DbLock.Unlock()
+	db.DbLock.Lock()
+	return obj.GetObjectFromDb(objKey, db.Conn)
+}
+
+func (db *DBUtil) GetAllEventObjFromDb(obj events.EventObj) ([]events.EventObj, error) {
+	if db.Conn == nil {
+		return make([]events.EventObj, 0), DBNotConnectedError{db.network, db.address}
+	}
+	defer db.DbLock.Unlock()
+	db.DbLock.Lock()
+	return obj.GetAllObjFromDb(db.Conn)
 }
 
 func (db *DBUtil) StoreValInDb(key interface{}, val interface{}, field interface{}) error {
@@ -231,4 +292,65 @@ func (db *DBUtil) GetValFromDB(key interface{}, field interface{}) (val interfac
 	}
 	err = errors.New("DB Connection handler is nil")
 	return val, err
+}
+
+func (db *DBUtil) StoreUUIDToObjKeyMap(objKey string) (string, error) {
+	UUId, err := uuid.NewV4()
+	if err != nil {
+		db.logger.Err(fmt.Sprintln("Failed to get UUID ", err))
+		return "", err
+	}
+	defer db.DbLock.Unlock()
+	db.DbLock.Lock()
+	_, err = db.Do("SET", UUId.String(), objKey)
+	if err != nil {
+		db.logger.Err(fmt.Sprintln("Failed to insert uuid to objkey entry in db ", err))
+		return "", err
+	}
+	objKeyWithUUIDPrefix := "UUID" + objKey
+	_, err = db.Do("SET", objKeyWithUUIDPrefix, UUId.String())
+	if err != nil {
+		db.logger.Err(fmt.Sprintln("Failed to insert objkey to uuid entry in db ", err))
+		return "", err
+	}
+	return UUId.String(), nil
+}
+
+func (db *DBUtil) DeleteUUIDToObjKeyMap(uuid, objKey string) error {
+	defer db.DbLock.Unlock()
+	db.DbLock.Lock()
+	_, err := db.Do("DEL", uuid)
+	if err != nil {
+		db.logger.Err(fmt.Sprintln("Failed to delete uuid to objkey entry in db ", err))
+		return err
+	}
+	objKeyWithUUIDPrefix := "UUID" + objKey
+	_, err = db.Do("DEL", objKeyWithUUIDPrefix)
+	if err != nil {
+		db.logger.Err(fmt.Sprintln("Failed to delete objkey to uuid entry in db ", err))
+		return err
+	}
+	return nil
+}
+
+func (db *DBUtil) GetUUIDFromObjKey(objKey string) (string, error) {
+	defer db.DbLock.Unlock()
+	db.DbLock.Lock()
+	objKeyWithUUIDPrefix := "UUID" + objKey
+	uuid, err := redis.String(db.Do("GET", objKeyWithUUIDPrefix))
+	if err != nil {
+		return "", err
+	}
+	return uuid, nil
+}
+
+func (db *DBUtil) GetObjKeyFromUUID(uuid string) (string, error) {
+	defer db.DbLock.Unlock()
+	db.DbLock.Lock()
+	objKey, err := redis.String(db.Do("GET", uuid))
+	if err != nil {
+		return "", err
+	}
+	objKey = strings.TrimRight(objKey, "UUID")
+	return objKey, nil
 }

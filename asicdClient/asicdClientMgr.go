@@ -65,6 +65,10 @@ type AsicdClientIntf interface {
 	FlushStgFdb(stgid int32) error
 	// BPDU Guard detection
 	BPDUGuardDetected(ifindex int32, enable bool) error
+
+	CreateLag(hashType int32, ports string) (int32, error)
+	DeleteLag(ifIndex int32) error
+	UpdateLag(ifIndex, hashType int32, ports string) error
 }
 
 func NewAsicdClientInit(plugin string, paramsFile string, asicdHdl commonDefs.AsicdClientStruct) AsicdClientIntf {
