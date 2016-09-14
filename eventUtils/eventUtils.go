@@ -181,7 +181,7 @@ func publishTxEvents(txEvt *TxEvent) error {
 	evt.SrcObjKey = txEvt.Key
 	evt.AdditionalData = txEvt.AdditionalData
 	msg, _ := json.Marshal(*evt)
-	keyStr := fmt.Sprintf("Events#%s#%s#%s#%v#%s#%d#", evt.OwnerName, evt.EventName, evt.SrcObjName, txEvt.Key, evt.TimeStamp.String(), evt.TimeStamp.UnixNano())
+	keyStr := fmt.Sprintf("Events#%d#%d#%s#%s#%s#%v#%s#%d#", evt.OwnerId, evt.EvtId, evt.OwnerName, evt.EventName, evt.SrcObjName, txEvt.Key, evt.TimeStamp.String(), evt.TimeStamp.UnixNano())
 	Logger.Info(fmt.Sprintln("Key Str :", keyStr))
 	dbData := EventDBData{
 		SrcObjKey:      txEvt.Key,
@@ -245,12 +245,24 @@ func GetEvents(evtObj events.EventObj, dbHdl dbutils.DBIntf, logger logging.Logg
 				continue
 			}
 			str := strings.Split(keyObj.Key, "#")
+			ownerId, err := strconv.Atoi(str[1])
+			if err != nil {
+				logger.Err(fmt.Sprintln("Invalid ownerId", err))
+				continue
+			}
+			eventId, err := strconv.Atoi(str[2])
+			if err != nil {
+				logger.Err(fmt.Sprintln("Invalid eventId", err))
+				continue
+			}
 			obj := events.Event{
-				OwnerName:      str[1],
-				EventName:      str[2],
-				TimeStamp:      str[5],
+				OwnerId:        int32(ownerId),
+				EventId:        int32(eventId),
+				OwnerName:      str[3],
+				EventName:      str[4],
+				TimeStamp:      str[7],
 				Description:    dbData.Description,
-				SrcObjName:     str[3],
+				SrcObjName:     str[5],
 				SrcObjKey:      dbData.SrcObjKey,
 				AdditionalData: dbData.AdditionalData,
 			}

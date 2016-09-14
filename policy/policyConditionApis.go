@@ -38,6 +38,17 @@ type PolicyPrefix struct {
 	IpPrefix        string //CIDR eg: 1.1.1.2/24
 	MasklengthRange string //exact or a specific range 21..24
 }
+type PolicyPrefixSetConfig struct {
+	Name       string
+	PrefixList []PolicyPrefix
+}
+type PolicyPrefixSet struct {
+	Name                string
+	PrefixList          []PolicyPrefix
+	PolicyConditionList []string
+	MatchInfoList       []MatchPrefixConditionInfo
+	LocalDBSliceIdx     int
+}
 type PolicyDstIpMatchPrefixSetCondition struct {
 	PrefixSet string
 	Prefix    PolicyPrefix
@@ -72,6 +83,153 @@ type PolicyCondition struct {
 	LocalDBSliceIdx      int
 }
 
+func (db *PolicyEngineDB) UpdatePrefixSet(condition PolicyCondition, prefixSetName string, op int) (err error) {
+	db.Logger.Info("UpdatePrefixSet for prefixset ", prefixSetName)
+	var i int
+	item := db.PolicyPrefixSetDB.Get(patriciaDB.Prefix(prefixSetName))
+	if item == nil {
+		db.Logger.Info("prefix set ", prefixSetName, " not defined")
+		err = errors.New("prefix set not defined")
+		return err
+	}
+	prefixSet := item.(PolicyPrefixSet)
+	if prefixSet.PolicyConditionList == nil {
+		if op == del {
+			db.Logger.Info("prefixSet.PolicyConditionList nil")
+			return err
+		}
+		prefixSet.PolicyConditionList = make([]string, 0)
+	}
+	if op == add {
+		prefixSet.PolicyConditionList = append(prefixSet.PolicyConditionList, condition.Name)
+	}
+	found := false
+	if op == del {
+		for i = 0; i < len(prefixSet.PolicyConditionList); i++ {
+			if prefixSet.PolicyConditionList[i] == condition.Name {
+				db.Logger.Info("Found the condition in the policy prefix set table, deleting it")
+				found = true
+				break
+			}
+		}
+		if found {
+			prefixSet.PolicyConditionList = append(prefixSet.PolicyConditionList[:i], prefixSet.PolicyConditionList[i+1:]...)
+		}
+	}
+	db.PolicyPrefixSetDB.Set(patriciaDB.Prefix(prefixSet.Name), prefixSet)
+	return err
+}
+
+func (db *PolicyEngineDB) ValidatePolicyPrefixSetCreate(inCfg PolicyPrefixSetConfig) (err error) {
+	db.Logger.Info("ValidatePolicyPrefixSetCreate")
+	policyPrefixSet := db.PolicyPrefixSetDB.Get(patriciaDB.Prefix(inCfg.Name))
+	if policyPrefixSet != nil {
+		db.Logger.Err("Duplicate Condition name")
+		err = errors.New("Duplicate policy prefixSet definition")
+		return err
+	}
+	return err
+}
+func (db *PolicyEngineDB) CreatePolicyPrefixSet(cfg PolicyPrefixSetConfig) (val bool, err error) {
+	db.Logger.Info("PolicyEngineDB CreatePolicyPrefixSet :", cfg.Name)
+	policyPrefixSet := db.PolicyPrefixSetDB.Get(patriciaDB.Prefix(cfg.Name))
+	if policyPrefixSet == nil {
+		db.Logger.Info("Defining a new policy prefix set with name ", cfg.Name)
+		prefixList := make([]PolicyPrefix, 0)
+		matchInfoList := make([]MatchPrefixConditionInfo, 0)
+		db.Logger.Info("cfg.PrefixList:", cfg.PrefixList)
+		for _, prefix := range cfg.PrefixList {
+			db.Logger.Info("range over cfg.PrefixList, current prefix:", prefix)
+			prefixList = append(prefixList, prefix)
+			var conditionInfo MatchPrefixConditionInfo
+			conditionInfo.HighRange = -1
+			conditionInfo.LowRange = -1
+			if len(prefix.IpPrefix) != 0 {
+				conditionInfo.UsePrefixSet = false
+				conditionInfo.Prefix.IpPrefix = prefix.IpPrefix
+				conditionInfo.Prefix.MasklengthRange = prefix.MasklengthRange
+				conditionInfo.IpPrefix, err = netUtils.GetNetworkPrefixFromCIDR(conditionInfo.Prefix.IpPrefix)
+				if err != nil {
+					db.Logger.Err(fmt.Sprintln("ipPrefix invalid "))
+					return
+				}
+				if prefix.MasklengthRange == "exact" {
+				} else {
+					maskList := strings.Split(conditionInfo.Prefix.MasklengthRange, "-")
+					if len(maskList) != 2 {
+						db.Logger.Err(fmt.Sprintln("Invalid masklength range"))
+						return
+					}
+					conditionInfo.LowRange, err = strconv.Atoi(maskList[0])
+					if err != nil {
+						db.Logger.Err(fmt.Sprintln("lowRange mask not valid"))
+						return
+					}
+					conditionInfo.HighRange, err = strconv.Atoi(maskList[1])
+					if err != nil {
+						db.Logger.Err(fmt.Sprintln("highRange mask not valid"))
+						return
+					}
+					db.Logger.Info(fmt.Sprintln("lowRange = ", conditionInfo.LowRange, " highrange = ", conditionInfo.HighRange))
+				}
+				matchInfoList = append(matchInfoList, conditionInfo)
+			}
+		}
+		db.Logger.Info("insert prefix set with prefixList:", prefixList, " matchInfoList:", matchInfoList)
+		if ok := db.PolicyPrefixSetDB.Insert(patriciaDB.Prefix(cfg.Name), PolicyPrefixSet{Name: cfg.Name, PrefixList: prefixList, MatchInfoList: matchInfoList}); ok != true {
+			db.Logger.Info(" return value not ok")
+			err = errors.New("Error creating policy prefix set in the DB")
+			return false, err
+		}
+		db.LocalPolicyPrefixSetDB.updateLocalDB(patriciaDB.Prefix(cfg.Name), add)
+	} else {
+		db.Logger.Err(fmt.Sprintln("Duplicate policy prefix set"))
+		err = errors.New("Duplicate policy policy prefix set definition")
+		return false, err
+	}
+	return true, err
+}
+func (db *PolicyEngineDB) ValidatePolicyPrefixSetDelete(cfg PolicyPrefixSetConfig) (err error) {
+	item := db.PolicyPrefixSetDB.Get(patriciaDB.Prefix(cfg.Name))
+	if item == nil {
+		db.Logger.Err("Prefix Set ", cfg.Name, "not found in the DB")
+		err = errors.New("Prefix Set not found")
+		return err
+	}
+	prefixSet := item.(PolicyPrefixSet)
+	if len(prefixSet.PolicyConditionList) != 0 {
+		db.Logger.Err("This prefix set is currently being used by a policy condition. Try deleting the condition before deleting the prefix set")
+		err = errors.New("This prefix set is currently being used by a policy condition. Try deleting the condition before deleting the prefixset")
+		return err
+	}
+	return nil
+}
+func (db *PolicyEngineDB) DeletePolicyPrefixSet(cfg PolicyPrefixSetConfig) (val bool, err error) {
+	db.Logger.Info("DeletePolicyPrefixSet")
+	err = db.ValidatePolicyPrefixSetDelete(cfg)
+	if err != nil {
+		db.Logger.Err("Validation failed for policy prefix set deletion with err:", err)
+		return false, err
+	}
+	item := db.PolicyPrefixSetDB.Get(patriciaDB.Prefix(cfg.Name))
+	if item == nil {
+		db.Logger.Err("Prefix set ", cfg.Name, "not found in the DB")
+		err = errors.New("Prefix set not found")
+		return false, err
+	}
+	prefixSet := item.(PolicyPrefixSet)
+	if len(prefixSet.PolicyConditionList) != 0 {
+		db.Logger.Err("This prefix set is currently being used by a policy condition. Try deleting the condition before deleting the prefix set")
+		err = errors.New("This prefix set is currently being used by a policy condition. Try deleting the condition before deleting the prefixset")
+		return false, err
+	}
+	deleted := db.PolicyPrefixSetDB.Delete(patriciaDB.Prefix(cfg.Name))
+	if deleted {
+		db.Logger.Info("Found and deleted prefix set ", cfg.Name)
+		db.LocalPolicyPrefixSetDB.updateLocalDB(patriciaDB.Prefix(cfg.Name), del)
+	}
+	return true, err
+}
 func (db *PolicyEngineDB) CreatePolicyDstIpMatchPrefixSetCondition(inCfg PolicyConditionConfig) (val bool, err error) {
 	db.Logger.Info(fmt.Sprintln("CreatePolicyDstIpMatchPrefixSetCondition"))
 	cfg := inCfg.MatchDstIpPrefixConditionInfo
@@ -129,6 +287,15 @@ func (db *PolicyEngineDB) CreatePolicyDstIpMatchPrefixSetCondition(inCfg PolicyC
 		db.Logger.Info(fmt.Sprintln("Defining a new policy condition with name ", inCfg.Name))
 		newPolicyCondition := PolicyCondition{Name: inCfg.Name, ConditionType: policyCommonDefs.PolicyConditionTypeDstIpPrefixMatch, ConditionInfo: conditionInfo, LocalDBSliceIdx: (len(*db.LocalPolicyConditionsDB))}
 		newPolicyCondition.ConditionGetBulkInfo = conditionGetBulkInfo
+		if len(cfg.PrefixSet) != 0 {
+			db.Logger.Info("Policy Condition has ", cfg.PrefixSet, " prefix set")
+			err = db.UpdatePrefixSet(newPolicyCondition, cfg.PrefixSet, add)
+			if err != nil {
+				db.Logger.Info("UpdatePrefixSet returned err ", err)
+				err = errors.New("Error with UpdatePrefixSet")
+				return false, err
+			}
+		}
 		if ok := db.PolicyConditionsDB.Insert(patriciaDB.Prefix(inCfg.Name), newPolicyCondition); ok != true {
 			db.Logger.Err(fmt.Sprintln(" return value not ok"))
 			err = errors.New("Error creating condition in the DB")
@@ -204,6 +371,7 @@ func (db *PolicyEngineDB) ValidateConditionConfigCreate(inCfg PolicyConditionCon
 		break
 	case "MatchDstIpPrefix":
 		cfg := inCfg.MatchDstIpPrefixConditionInfo
+		db.Logger.Info("ValidateConditionConfigCreate:cfg.PrefixSet:", cfg.PrefixSet, " len(cfg.PrefixSet):", len(cfg.PrefixSet))
 		if len(cfg.PrefixSet) == 0 && len(cfg.Prefix.IpPrefix) == 0 {
 			db.Logger.Err(fmt.Sprintln("Empty prefix set/nil prefix"))
 			err = errors.New("Empty prefix set/nil prefix")
@@ -250,6 +418,11 @@ func (db *PolicyEngineDB) ValidateConditionConfigCreate(inCfg PolicyConditionCon
 }
 func (db *PolicyEngineDB) CreatePolicyCondition(cfg PolicyConditionConfig) (val bool, err error) {
 	db.Logger.Info(fmt.Sprintln("CreatePolicyCondition"))
+	err = db.ValidateConditionConfigCreate(cfg)
+	if err != nil {
+		db.Logger.Err("Validation failed for policy condition creation with err:", err)
+		return false, err
+	}
 	switch cfg.ConditionType {
 	case "MatchDstIpPrefix":
 		val, err = db.CreatePolicyDstIpMatchPrefixSetCondition(cfg)
@@ -285,6 +458,11 @@ func (db *PolicyEngineDB) ValidateConditionConfigDelete(cfg PolicyConditionConfi
 }
 func (db *PolicyEngineDB) DeletePolicyCondition(cfg PolicyConditionConfig) (val bool, err error) {
 	db.Logger.Info(fmt.Sprintln("DeletePolicyCondition"))
+	err = db.ValidateConditionConfigDelete(cfg)
+	if err != nil {
+		db.Logger.Err("Validation failed for policy condition deletion with err:", err)
+		return false, err
+	}
 	conditionItem := db.PolicyConditionsDB.Get(patriciaDB.Prefix(cfg.Name))
 	if conditionItem == nil {
 		db.Logger.Err(fmt.Sprintln("Condition ", cfg.Name, "not found in the DB"))
@@ -301,6 +479,17 @@ func (db *PolicyEngineDB) DeletePolicyCondition(cfg PolicyConditionConfig) (val 
 	if deleted {
 		db.Logger.Info(fmt.Sprintln("Found and deleted condition ", cfg.Name))
 		db.LocalPolicyConditionsDB.updateLocalDB(patriciaDB.Prefix(cfg.Name), del)
+		if condition.ConditionType == policyCommonDefs.PolicyConditionTypeDstIpPrefixMatch {
+			conditionInfo := condition.ConditionInfo.(MatchPrefixConditionInfo)
+			if len(conditionInfo.PrefixSet) != 0 {
+				err = db.UpdatePrefixSet(condition, conditionInfo.PrefixSet, del)
+				if err != nil {
+					db.Logger.Info("UpdatePrefixSet returned err ", err)
+					err = errors.New("Error with UpdatePrefixSet")
+					return false, err
+				}
+			}
+		}
 	}
 	return true, err
 }

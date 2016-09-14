@@ -66,9 +66,18 @@ type AsicdClientIntf interface {
 	// BPDU Guard detection
 	BPDUGuardDetected(ifindex int32, enable bool) error
 
-	CreateLag(hashType int32, ports string) (int32, error)
+	CreateLag(ifname string, hashType int32, ports string) (int32, error)
 	DeleteLag(ifIndex int32) error
 	UpdateLag(ifIndex, hashType int32, ports string) error
+
+	EnablePacketReception(mac string, vlan int, ifindex int32) error
+	DisablePacketReception(mac string, vlan int, ifindex int32) error
+
+	// Distributed Relay (MLAG) Ipp actions when in Time Sharing Mode
+	IppIngressEgressDrop(srcIfIndex, dstIfIndex int32) error
+	IppIngressEgressPass(srcIfIndex, dstIfIndex int32) error
+	IppVlanConversationSet(vlan uint16, ifindex int32) error
+	IppVlanConversationClear(vlan uint16, ifindex int32) error
 }
 
 func NewAsicdClientInit(plugin string, paramsFile string, asicdHdl commonDefs.AsicdClientStruct) AsicdClientIntf {

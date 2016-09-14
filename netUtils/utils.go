@@ -25,10 +25,12 @@
 package netUtils
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"net"
 	"strconv"
+	"strings"
 	"utils/patriciaDB"
 )
 
@@ -131,19 +133,26 @@ func GetNetworkPrefix(destNetIp net.IP, networkMask net.IP) (destNet patriciaDB.
 		fmt.Println("err when getting prefixLen, err= ", err)
 		return destNet, errors.New(fmt.Sprintln("Invalid networkmask ", networkMask))
 	}
+	//	fmt.Println("prefixLen for :", networkMask, ":", prefixLen)
 	var netIp net.IP
 	vdestMask := net.IPMask(networkMask)
 	if IsIPv4Mask(net.IP(vdestMask)) {
+		//	fmt.Println("v4,vdestMask[12:16]:", vdestMask[12:16])
 		netIp = destNetIp.Mask(vdestMask[12:16])
 	} else {
 		netIp = destNetIp.Mask(vdestMask)
+	}
+	if netIp == nil {
+		fmt.Println("netip nil ")
+		return destNet, errors.New("netIp nil")
 	}
 	numbytes := prefixLen / 8
 	if (prefixLen % 8) != 0 {
 		numbytes++
 	}
 	destNet = make([]byte, numbytes)
-	for i := 0; i < numbytes; i++ {
+	//	fmt.Println("numbytes:", numbytes, " netIp:", netIp, " len(netIp):", len(netIp))
+	for i := 0; i < numbytes && i < len(netIp); i++ {
 		destNet[i] = netIp[i]
 	}
 	return destNet, err
@@ -169,43 +178,55 @@ func GetCIDR(ipAddr string, mask string) (addr string, err error) {
 }
 func CheckIfInRange(testIPAddr, ipAddr string, lowPrefixLen int, highPrefixLen int) bool {
 	//fmt.Println("testIPAddr:", testIPAddr, " ipAddr:", ipAddr, " lowPrefixLen:", lowPrefixLen, " highPrefixLen:", highPrefixLen)
-	//testAddr := net.ParseIP(testIPAddr)
+	testIPStrings := strings.SplitAfter(testIPAddr, "/")
+	if len(testIPStrings) != 2 {
+		fmt.Println("Invalid cidr :", testIPAddr)
+		return false
+	}
+	testPrefixLenStr := testIPStrings[1]
+	testPrefixLen, _ := strconv.Atoi(testPrefixLenStr)
+
+	baseIPStrings := strings.SplitAfter(ipAddr, "/")
+	if len(baseIPStrings) != 2 {
+		fmt.Println("Invalid cidr :", ipAddr)
+		return false
+	}
+	basePrefixLenStr := baseIPStrings[1]
+	basePrefixLen, _ := strconv.Atoi(basePrefixLenStr)
+
 	testAddr, _, err := net.ParseCIDR(testIPAddr)
 	if err != nil {
 		fmt.Println("error parsing address:", testIPAddr)
 		return false
 	}
 	if lowPrefixLen == -1 && highPrefixLen == -1 {
-		_, cidrnet, err := net.ParseCIDR(ipAddr)
-		if err != nil {
-			fmt.Println("Error parsing cidr addr ", ipAddr)
+		//exact case
+		if testPrefixLen != basePrefixLen {
+			//fmt.Println("Prefix len ", testPrefixLen, "is not the exact prefix as", basePrefixLen, " for ", testIPAddr, " and ", ipAddr)
 			return false
 		}
-		if cidrnet.Contains(testAddr) == true {
-			//fmt.Println(cidrnet, " contains ip:", testAddr)
-			return true
-		} else {
-			fmt.Println(cidrnet, " does not contain ip:", testAddr)
+	} else {
+		//for a range
+		if testPrefixLen > highPrefixLen || testPrefixLen < lowPrefixLen {
+			//fmt.Println("Prefix len ", testPrefixLen, " not with range for ", lowPrefixLen, " and", highPrefixLen, " for ", testIPAddr, " and ", ipAddr)
 			return false
 		}
 	}
-	baseAddr, _, err := net.ParseCIDR(ipAddr)
+	testCidr := testAddr.String() + "/" + basePrefixLenStr
+	testIpPrefix, err := GetNetworkPrefixFromCIDR(testCidr)
 	if err != nil {
-		fmt.Println("error parsing address:", ipAddr)
+		fmt.Println("Invalid ipPrefix for the route ", testAddr)
 		return false
 	}
-	for idx := lowPrefixLen; idx <= highPrefixLen; idx++ {
-		networkAddr := baseAddr.String() + "/" + strconv.Itoa(idx)
-		_, cidrnet, err := net.ParseCIDR(networkAddr)
-		if err != nil {
-			fmt.Println("Error parsing cidr addr ", networkAddr)
-			return false
-		}
-		if cidrnet.Contains(testAddr) == true {
-			//fmt.Println(cidrnet, " contains ip:", testAddr)
-			return true
-		}
+	ipPrefix, err := GetNetworkPrefixFromCIDR(ipAddr)
+	if err != nil {
+		fmt.Println("Invalid ipPrefix for the route ", ipAddr)
+		return false
 	}
+	if bytes.Equal(testIpPrefix, ipPrefix) {
+		return true
+	}
+
 	return false
 }
 

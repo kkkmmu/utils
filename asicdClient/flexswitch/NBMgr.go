@@ -83,6 +83,7 @@ func processL3IntfStateNotifyMsg(rxMsgType uint8, rxMsg []byte, logger *logging.
 	}
 	msg = commonDefs.L3IntfStateNotifyMsg{
 		MsgType: rxMsgType,
+		IpType:  l3Msg.IpType,
 		IpAddr:  l3Msg.IpAddr,
 		IfIndex: l3Msg.IfIndex,
 		IfState: l3Msg.IfState,
@@ -154,6 +155,7 @@ func processIPv6IntfNotifyMsg(rxMsgType uint8, rxMsg []byte, logger *logging.Wri
 		MsgType: rxMsgType,
 		IpAddr:  ipv6Msg.IpAddr,
 		IfIndex: ipv6Msg.IfIndex,
+		IntfRef: ipv6Msg.IntfRef,
 	}
 
 	return msg, nil

@@ -30,7 +30,6 @@ import (
 	"asicdServices"
 	"encoding/json"
 	"fmt"
-	"git.apache.org/thrift.git/lib/go/thrift"
 	"io/ioutil"
 	"strconv"
 	"strings"
@@ -39,6 +38,8 @@ import (
 	"utils/commonDefs"
 	"utils/ipcutils"
 	"utils/logging"
+
+	"git.apache.org/thrift.git/lib/go/thrift"
 )
 
 type AsicdClient struct {
@@ -689,11 +690,12 @@ func (asicdClientMgr *FSAsicdClientMgr) BPDUGuardDetected(ifindex int32, enable 
 func (asicdClientMgr *FSAsicdClientMgr) GetSwitchMAC(paramsPath string) string {
 	var cfgFile CfgFileJson
 
-	asicdconffilename := paramsPath + "asicd.conf"
+	asicdconffilename := paramsPath + pluginCommon.ASICD_CONFIG_FILE
 
 	cfgFileData, err := ioutil.ReadFile(asicdconffilename)
 	if err != nil {
-		Logger.Err("Error reading config file - asicd.conf. Using defaults (linux plugin only)")
+		Logger.Err("Error reading config file -", pluginCommon.ASICD_CONFIG_FILE,
+			". Using defaults (linux plugin only)")
 		return "00:00:00:00:00:00"
 	}
 	err = json.Unmarshal(cfgFileData, &cfgFile)
@@ -705,20 +707,20 @@ func (asicdClientMgr *FSAsicdClientMgr) GetSwitchMAC(paramsPath string) string {
 	return cfgFile.SwitchMac
 }
 
-func (asicdClientMgr *FSAsicdClientMgr) CreateLag(hashType int32, ports string) (hwAggId int32, err error) {
+func (asicdClientMgr *FSAsicdClientMgr) CreateLag(ifName string, hashType int32, ports string) (ifindex int32, err error) {
 	if asicdClientMgr.ClientHdl != nil {
 		asicdmutex.Lock()
-		hwAggId, err = asicdClientMgr.ClientHdl.CreateLag(hashType, ports)
+		ifindex, err = asicdClientMgr.ClientHdl.CreateLag(ifName, hashType, ports)
 		asicdmutex.Unlock()
-		return hwAggId, err
+		return ifindex, err
 	}
 	return -1, err
 }
 
-func (asicdClientMgr *FSAsicdClientMgr) DeleteLag(hwAggId int32) (err error) {
+func (asicdClientMgr *FSAsicdClientMgr) DeleteLag(ifIndex int32) (err error) {
 	if asicdClientMgr.ClientHdl != nil {
 		asicdmutex.Lock()
-		_, err = asicdClientMgr.ClientHdl.DeleteLag(hwAggId)
+		_, err = asicdClientMgr.ClientHdl.DeleteLag(ifIndex)
 		asicdmutex.Unlock()
 	}
 	return err
@@ -729,6 +731,164 @@ func (asicdClientMgr *FSAsicdClientMgr) UpdateLag(ifIndex, hashType int32, ports
 		asicdmutex.Lock()
 		_, err = asicdClientMgr.ClientHdl.UpdateLag(ifIndex, hashType, ports)
 		asicdmutex.Unlock()
+	}
+	return err
+}
+
+func (asicdClientMgr *FSAsicdClientMgr) EnablePacketReception(mac string, vlan int, ifindex int32) (err error) {
+	if asicdClientMgr.ClientHdl != nil {
+		asicdmutex.Lock()
+		cfg := &asicdInt.RsvdProtocolMacConfig{
+			MacAddr:     mac,
+			MacAddrMask: "FF:FF:FF:FF:FF:FF",
+		}
+		_, err = asicdClientMgr.ClientHdl.EnablePacketReception(cfg)
+		asicdmutex.Unlock()
+	}
+	return err
+
+}
+
+func (asicdClientMgr *FSAsicdClientMgr) DisablePacketReception(mac string, vlan int, ifindex int32) (err error) {
+	if asicdClientMgr.ClientHdl != nil {
+		asicdmutex.Lock()
+		cfg := &asicdInt.RsvdProtocolMacConfig{
+			MacAddr:     mac,
+			MacAddrMask: "FF:FF:FF:FF:FF:FF",
+		}
+		_, err = asicdClientMgr.ClientHdl.DisablePacketReception(cfg)
+		asicdmutex.Unlock()
+	}
+	return err
+
+}
+
+// TODO change this to pass in the Intf
+func (asicdClientMgr *FSAsicdClientMgr) IppIngressEgressDrop(srcIfIndex, dstIfIndex int32) (err error) {
+
+	if asicdClientMgr.ClientHdl != nil {
+		asicdmutex.Lock()
+		aclName := fmt.Sprintf("IPPInOutBlockfpPort%d", dstIfIndex+1)
+		ruleName := fmt.Sprintf("%sfpPort%d", aclName, srcIfIndex+1)
+		rule := &asicdServices.AclRule{
+			RuleName: ruleName,
+			SrcPort:  srcIfIndex,
+			DstPort:  dstIfIndex,
+		}
+
+		_, err = asicdClientMgr.ClientHdl.CreateAclRule(rule)
+		if err != nil {
+			asicdmutex.Unlock()
+			return err
+		}
+		acl := &asicdServices.Acl{
+			AclName:      aclName,
+			RuleNameList: []string{ruleName},
+			IntfList:     []string{fmt.Sprintf("fpPort%d", dstIfIndex+1)},
+			Direction:    "OUT",
+		}
+
+		_, err = asicdClientMgr.ClientHdl.CreateAcl(acl)
+		asicdmutex.Unlock()
+	}
+
+	return err
+}
+
+func (asicdClientMgr *FSAsicdClientMgr) IppIngressEgressPass(srcIfIndex, dstIfIndex int32) (err error) {
+
+	if asicdClientMgr.ClientHdl != nil {
+		asicdmutex.Lock()
+		aclName := fmt.Sprintf("IPPInOutBlockfpPort%d", dstIfIndex+1)
+		ruleName := fmt.Sprintf("%sfpPort%d", aclName, srcIfIndex+1)
+		rule := &asicdServices.AclRule{
+			RuleName: ruleName,
+			SrcPort:  srcIfIndex,
+			DstPort:  dstIfIndex,
+		}
+
+		_, err = asicdClientMgr.ClientHdl.CreateAclRule(rule)
+		if err != nil {
+			asicdmutex.Unlock()
+			return err
+		}
+		acl := &asicdServices.Acl{
+			AclName:      aclName,
+			RuleNameList: []string{ruleName},
+			IntfList:     []string{fmt.Sprintf("fpPort%d", dstIfIndex+1)},
+			Direction:    "OUT",
+		}
+
+		_, err = asicdClientMgr.ClientHdl.CreateAcl(acl)
+		asicdmutex.Unlock()
+	}
+
+	return err
+}
+
+func (asicdClientMgr *FSAsicdClientMgr) IppVlanConversationSet(vlan uint16, ifindex int32) error {
+
+	// get the vlan info
+	vlanInfo, err := asicdClientMgr.ClientHdl.GetBulkVlan(asicdInt.Int(vlan), asicdInt.Int(vlan))
+	if err != nil {
+		return err
+	}
+
+	// append the port to the vlan
+	for i := vlanInfo.StartIdx; i < (vlanInfo.StartIdx + vlanInfo.Count); i++ {
+		vlancfg := vlanInfo.VlanList[i]
+		for _, ifndx := range vlancfg.IfIndexList {
+			if ifndx == ifindex {
+				return nil
+			}
+		}
+		oldvlancfg := &asicdServices.Vlan{
+			VlanId: int32(vlan),
+		}
+		newvlancfg := &asicdServices.Vlan{
+			VlanId: int32(vlan),
+		}
+		patchList := []*asicdServices.PatchOpInfo{&asicdServices.PatchOpInfo{
+			Op:    "add",
+			Path:  "IntfList",
+			Value: fmt.Sprintf("%s", ifindex),
+		}}
+		_, err = asicdClientMgr.ClientHdl.UpdateVlan(oldvlancfg, newvlancfg, nil, patchList)
+		//(1: Vlan origconfig, 2: Vlan newconfig, 3: list<bool> attrset, 4: list<PatchOpInfo> op)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (asicdClientMgr *FSAsicdClientMgr) IppVlanConversationClear(vlan uint16, ifindex int32) (err error) {
+	// get the vlan info
+	vlanInfo, err := asicdClientMgr.ClientHdl.GetBulkVlan(asicdInt.Int(vlan), asicdInt.Int(vlan))
+	if err != nil {
+		return err
+	}
+
+	// append the port to the vlan
+	for i := vlanInfo.StartIdx; i < (vlanInfo.StartIdx + vlanInfo.Count); i++ {
+		vlancfg := vlanInfo.VlanList[i]
+		for _, ifndx := range vlancfg.IfIndexList {
+			if ifndx == ifindex {
+				oldvlancfg := &asicdServices.Vlan{
+					VlanId: int32(vlan),
+				}
+				newvlancfg := &asicdServices.Vlan{
+					VlanId: int32(vlan),
+				}
+				patchList := []*asicdServices.PatchOpInfo{&asicdServices.PatchOpInfo{
+					Op:    "remove",
+					Path:  "IntfList",
+					Value: fmt.Sprintf("%s", ifindex),
+				}}
+				_, err = asicdClientMgr.ClientHdl.UpdateVlan(oldvlancfg, newvlancfg, nil, patchList)
+				break
+			}
+		}
 	}
 	return err
 }

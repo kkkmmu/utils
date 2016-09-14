@@ -149,7 +149,7 @@ func (asicdClientMgr *OvsAsicdClientMgr) GetSwitchMAC(paramsPath string) string 
 	return "00:00:00:00:00:00"
 }
 
-func (asicdClientMgr *OvsAsicdClientMgr) CreateLag(hashType int32, ports string) (hwAggId int32, err error) {
+func (asicdClientMgr *OvsAsicdClientMgr) CreateLag(ifname string, hashType int32, ports string) (hwAggId int32, err error) {
 	return -1, err
 }
 
@@ -158,5 +158,28 @@ func (asicdClientMgr *OvsAsicdClientMgr) DeleteLag(hwAggId int32) (err error) {
 }
 
 func (asicdClientMgr *OvsAsicdClientMgr) UpdateLag(ifIndex, hashType int32, ports string) (err error) {
+	return err
+}
+
+func (asicdClientMgr *OvsAsicdClientMgr) EnablePacketReception(mac string, vlan int, ifindex int32) (err error) {
+	return err
+}
+
+func (asicdClientMgr *OvsAsicdClientMgr) DisablePacketReception(mac string, vlan int, ifindex int32) (err error) {
+	return err
+}
+
+func (asicdClientMgr *OvsAsicdClientMgr) IppIngressEgressDrop(srcIfIndex, dstIfIndex int32) (err error) {
+	return err
+}
+
+func (asicdClientMgr *OvsAsicdClientMgr) IppIngressEgressPass(srcIfIndex, dstIfIndex int32) (err error) {
+	return err
+}
+
+func (asicdClientMgr *OvsAsicdClientMgr) IppVlanConversationSet(vlan uint16, ifindex int32) (err error) {
+	return err
+}
+func (asicdClientMgr *OvsAsicdClientMgr) IppVlanConversationClear(vlan uint16, ifindex int32) (err error) {
 	return err
 }

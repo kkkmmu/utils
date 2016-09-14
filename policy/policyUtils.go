@@ -78,6 +78,10 @@ type ApplyPolicyInfo struct {
 	Action      PolicyAction
 	Conditions  []string //extra condition names
 }
+type ApplyPolicyMapInfo struct {
+	Count    int
+	InfoList []ApplyPolicyInfo
+}
 type LocalDB struct {
 	Prefix     patriciaDB.Prefix
 	IsValid    bool
@@ -126,6 +130,8 @@ type GetPolicyEnityMapIndexFunc func(entity PolicyEngineFilterEntityParams, poli
 
 type PolicyEngineDB struct {
 	Logger                          *logging.Writer //*log.Logger
+	PolicyPrefixSetDB               *patriciaDB.Trie
+	LocalPolicyPrefixSetDB          *LocalDBSlice
 	PolicyConditionsDB              *patriciaDB.Trie
 	LocalPolicyConditionsDB         *LocalDBSlice
 	PolicyActionsDB                 *patriciaDB.Trie
@@ -139,7 +145,7 @@ type PolicyEngineDB struct {
 	ProtocolPolicyListDB            map[string][]string //policystmt names assoociated with every protocol type
 	ImportPolicyPrecedenceMap       map[int]string
 	ExportPolicyPrecedenceMap       map[int]string
-	ApplyPolicyMap                  map[string][]ApplyPolicyInfo
+	ApplyPolicyMap                  map[string]ApplyPolicyMapInfo
 	PolicyEntityMap                 map[PolicyEntityMapIndex]PolicyStmtMap
 	DefaultImportPolicyActionFunc   Policyfunc
 	DefaultExportPolicyActionFunc   Policyfunc
@@ -153,6 +159,7 @@ type PolicyEngineDB struct {
 	TraverseAndReversePolicyFunc    EntityTraverseAndReversePolicyfunc
 	ValidConditionsForPolicyTypeMap map[string][]int //map of policyType to list of valid conditions
 	ValidActionsForPolicyTypeMap    map[string][]int //map of policyType to list of valid actions
+	Global                          bool             //this variable is to say whether this engine is for storing the policies only (true)) or the actual engine : default is false, meaning it is an application engine
 }
 
 func (db *PolicyEngineDB) buildPolicyConditionCheckfuncMap() {
@@ -165,6 +172,9 @@ func (db *PolicyEngineDB) buildPolicyValidConditionsForPolicyTypeMap() {
 	db.Logger.Info("buildPolicyValidConditionsForPolicyTypeMap")
 	db.ValidConditionsForPolicyTypeMap["ALL"] = []int{policyCommonDefs.PolicyConditionTypeDstIpPrefixMatch,
 		policyCommonDefs.PolicyConditionTypeProtocolMatch, policyCommonDefs.PolicyConditionTypeNeighborMatch}
+	db.ValidConditionsForPolicyTypeMap["BGP"] = []int{policyCommonDefs.PolicyConditionTypeDstIpPrefixMatch,
+		policyCommonDefs.PolicyConditionTypeNeighborMatch}
+	db.ValidConditionsForPolicyTypeMap["OSPF"] = []int{policyCommonDefs.PolicyConditionTypeDstIpPrefixMatch}
 }
 func (db *PolicyEngineDB) buildPolicyValidActionsForPolicyTypeMap() {
 	db.Logger.Info("buildPolicyValidActionsForPolicyTypeMap")
@@ -191,6 +201,11 @@ func NewPolicyEngineDB(logger *logging.Writer) (policyEngineDB *PolicyEngineDB) 
 	localActionSlice := LocalDBSlice(LocalPolicyActionsDB)
 	policyEngineDB.LocalPolicyActionsDB = &localActionSlice
 
+	policyEngineDB.PolicyPrefixSetDB = patriciaDB.NewTrie()
+	LocalPolicyPrefixSetDB := make([]LocalDB, 0)
+	localPrefixSetSlice := LocalDBSlice(LocalPolicyPrefixSetDB)
+	policyEngineDB.LocalPolicyPrefixSetDB = &localPrefixSetSlice
+
 	policyEngineDB.PolicyConditionsDB = patriciaDB.NewTrie()
 	LocalPolicyConditionsDB := make([]LocalDB, 0)
 	localConditionSlice := LocalDBSlice(LocalPolicyConditionsDB)
@@ -212,7 +227,7 @@ func NewPolicyEngineDB(logger *logging.Writer) (policyEngineDB *PolicyEngineDB) 
 	policyEngineDB.ProtocolPolicyListDB = make(map[string][]string)
 	policyEngineDB.ImportPolicyPrecedenceMap = make(map[int]string)
 	policyEngineDB.ExportPolicyPrecedenceMap = make(map[int]string)
-	policyEngineDB.ApplyPolicyMap = make(map[string][]ApplyPolicyInfo)
+	policyEngineDB.ApplyPolicyMap = make(map[string]ApplyPolicyMapInfo)
 	policyEngineDB.ConditionCheckfuncMap = make(map[int]PolicyConditionCheckfunc)
 	policyEngineDB.ValidConditionsForPolicyTypeMap = make(map[string][]int)
 	policyEngineDB.ValidActionsForPolicyTypeMap = make(map[string][]int)
@@ -221,6 +236,7 @@ func NewPolicyEngineDB(logger *logging.Writer) (policyEngineDB *PolicyEngineDB) 
 	policyEngineDB.buildPolicyValidActionsForPolicyTypeMap()
 	policyEngineDB.ActionfuncMap = make(map[int]Policyfunc)
 	policyEngineDB.UndoActionfuncMap = make(map[int]UndoActionfunc)
+	policyEngineDB.Global = false
 	return policyEngineDB
 }
 

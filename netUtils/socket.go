@@ -109,6 +109,10 @@ func Socket(family, sotype, proto int) (int, error) {
 	return s, nil
 }
 
+func CloseSocket(socket int) {
+	syscall.Close(socket)
+}
+
 func ConnectSocket(network, remote, local string) (int, error) {
 	//fmt.Println("ConnectSocket: network=", network, "remote =", remote, "local =", local)
 	var localAddr net.Addr
@@ -150,10 +154,12 @@ func ConnectSocket(network, remote, local string) (int, error) {
 	}
 	if err = SetDefaultConnectSockopts(socket); err != nil {
 		fmt.Println("ConnectSocket: SetDefaultConnectSockopts failed")
+		CloseSocket(socket)
 		return -1, err
 	}
 	if err = SetSockoptIPv6Only(socket, family, socketType, ipv6only); err != nil {
 		fmt.Println("ConnectSocket: SetSockoptIPv6Only failed")
+		CloseSocket(socket)
 		return -1, err
 	}
 

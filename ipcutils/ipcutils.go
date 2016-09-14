@@ -24,10 +24,10 @@
 package ipcutils
 
 import (
-	//"fmt"
 	"git.apache.org/thrift.git/lib/go/thrift"
 	"models/objects"
 	"sync"
+	"utils/dbutils"
 )
 
 type IPCClientBase struct {
@@ -85,10 +85,10 @@ func (clnt *IPCClientBase) CloseIPCHandles() error {
 	return nil
 }
 
-func (clnt *IPCClientBase) PreConfigValidation(obj objects.ConfigObj) error {
+func (clnt *IPCClientBase) PreUpdateValidation(dbObj, obj objects.ConfigObj, attrSet []bool, dbHdl *dbutils.DBUtil) error {
 	return nil
 }
 
-func (clnt *IPCClientBase) PostConfigProcessing(obj objects.ConfigObj) error {
+func (clnt *IPCClientBase) PostUpdateProcessing(dbObj, obj objects.ConfigObj, attSet []bool, dbHdl *dbutils.DBUtil) error {
 	return nil
 }
