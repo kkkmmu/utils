@@ -140,7 +140,7 @@ func (asicdClientMgr *MockAsicdClientMgr) SetStgPortState(stgid int32, ifindex i
 	return nil
 }
 
-func (asicdClientMgr *MockAsicdClientMgr) FlushStgFdb(stgid int32) error {
+func (asicdClientMgr *MockAsicdClientMgr) FlushStgFdb(stgid, ifindex int32) error {
 	return nil
 }
 
@@ -172,11 +172,11 @@ func (asicdClientMgr *MockAsicdClientMgr) DisablePacketReception(mac string, vla
 	return err
 }
 
-func (asicdClientMgr *MockAsicdClientMgr) IppIngressEgressDrop(srcIfIndex, dstIfIndex int32) (err error) {
+func (asicdClientMgr *MockAsicdClientMgr) IppIngressEgressDrop(srcIfIndex, dstIfIndex string) (err error) {
 	return err
 }
 
-func (asicdClientMgr *MockAsicdClientMgr) IppIngressEgressPass(srcIfIndex, dstIfIndex int32) (err error) {
+func (asicdClientMgr *MockAsicdClientMgr) IppIngressEgressPass(srcIfIndex, dstIfIndex string) (err error) {
 	return err
 }
 
@@ -185,4 +185,7 @@ func (asicdClientMgr *MockAsicdClientMgr) IppVlanConversationSet(vlan uint16, if
 }
 func (asicdClientMgr *MockAsicdClientMgr) IppVlanConversationClear(vlan uint16, ifindex int32) (err error) {
 	return err
+}
+func (asicdClientMgr *MockAsicdClientMgr) IsLoopbackType(ifIndex int32) bool {
+	return true
 }

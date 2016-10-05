@@ -79,15 +79,16 @@ func (rB *RingBuffer) Get(ptr int) interface{} {
 	return rB.buffer[p]
 }
 
-func (rB *RingBuffer) InsertIntoRingBuffer(intf interface{}) int {
+func (rB *RingBuffer) InsertIntoRingBuffer(intf interface{}) (int, interface{}) {
 	rB.verifyInit()
+	oldVal := rB.Get(rB.wPtr + 1)
 	rB.Set(rB.wPtr+1, intf)
 	old := rB.wPtr
 	rB.wPtr = rB.Modulo(rB.wPtr + 1)
 	if old != -1 && rB.wPtr == rB.rPtr {
 		rB.rPtr = rB.Modulo(rB.rPtr + 1)
 	}
-	return rB.wPtr
+	return rB.wPtr, oldVal
 }
 
 func (rB *RingBuffer) DeleteFromRingBuffer() interface{} {
@@ -138,4 +139,15 @@ func (rB *RingBuffer) UpdateEntryInRingBuffer(intf interface{}, idx int) {
 func (rB *RingBuffer) GetEntryFromRingBuffer(idx int) interface{} {
 	ptr := rB.Modulo(idx)
 	return rB.buffer[ptr]
+}
+
+func (rB *RingBuffer) FlushRingBuffer() {
+	rB.verifyInit()
+	if rB.wPtr == -1 {
+		return
+	}
+
+	rB.wPtr = -1
+	rB.rPtr = 0
+	return
 }

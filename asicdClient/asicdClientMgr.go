@@ -62,7 +62,7 @@ type AsicdClientIntf interface {
 	// set forwarding/learning/blocked state
 	SetStgPortState(stgid int32, ifindex int32, state int) error
 	// Flush the macs associated with this stg
-	FlushStgFdb(stgid int32) error
+	FlushStgFdb(stgid, ifindex int32) error
 	// BPDU Guard detection
 	BPDUGuardDetected(ifindex int32, enable bool) error
 
@@ -74,10 +74,12 @@ type AsicdClientIntf interface {
 	DisablePacketReception(mac string, vlan int, ifindex int32) error
 
 	// Distributed Relay (MLAG) Ipp actions when in Time Sharing Mode
-	IppIngressEgressDrop(srcIfIndex, dstIfIndex int32) error
-	IppIngressEgressPass(srcIfIndex, dstIfIndex int32) error
+	IppIngressEgressDrop(srcIfIndex, dstIfIndex string) error
+	IppIngressEgressPass(srcIfIndex, dstIfIndex string) error
 	IppVlanConversationSet(vlan uint16, ifindex int32) error
 	IppVlanConversationClear(vlan uint16, ifindex int32) error
+
+	IsLoopbackType(ifIndex int32) bool
 }
 
 func NewAsicdClientInit(plugin string, paramsFile string, asicdHdl commonDefs.AsicdClientStruct) AsicdClientIntf {

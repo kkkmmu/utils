@@ -663,10 +663,10 @@ func (asicdClientMgr *FSAsicdClientMgr) SetStgPortState(stgid int32, ifindex int
 	return nil
 }
 
-func (asicdClientMgr *FSAsicdClientMgr) FlushStgFdb(stgid int32) error {
+func (asicdClientMgr *FSAsicdClientMgr) FlushStgFdb(stgid, ifindex int32) error {
 	if asicdClientMgr.ClientHdl != nil {
 		asicdmutex.Lock()
-		_, err := asicdClientMgr.ClientHdl.FlushFdbStgGroup(stgid)
+		err := asicdClientMgr.ClientHdl.FlushFdbStgGroup(stgid, ifindex)
 		asicdmutex.Unlock()
 		return err
 	}
@@ -764,12 +764,12 @@ func (asicdClientMgr *FSAsicdClientMgr) DisablePacketReception(mac string, vlan 
 }
 
 // TODO change this to pass in the Intf
-func (asicdClientMgr *FSAsicdClientMgr) IppIngressEgressDrop(srcIfIndex, dstIfIndex int32) (err error) {
+func (asicdClientMgr *FSAsicdClientMgr) IppIngressEgressDrop(srcIfIndex, dstIfIndex string) (err error) {
 
 	if asicdClientMgr.ClientHdl != nil {
 		asicdmutex.Lock()
-		aclName := fmt.Sprintf("IPPInOutBlockfpPort%d", dstIfIndex+1)
-		ruleName := fmt.Sprintf("%sfpPort%d", aclName, srcIfIndex+1)
+		aclName := fmt.Sprintf("IPPInOutBlockfpPort%s", dstIfIndex)
+		ruleName := fmt.Sprintf("%sfpPort%s", aclName, srcIfIndex)
 		rule := &asicdServices.AclRule{
 			RuleName: ruleName,
 			SrcPort:  srcIfIndex,
@@ -783,8 +783,8 @@ func (asicdClientMgr *FSAsicdClientMgr) IppIngressEgressDrop(srcIfIndex, dstIfIn
 		}
 		acl := &asicdServices.Acl{
 			AclName:      aclName,
+			AclType:      "MLAG",
 			RuleNameList: []string{ruleName},
-			IntfList:     []string{fmt.Sprintf("fpPort%d", dstIfIndex+1)},
 			Direction:    "OUT",
 		}
 
@@ -795,12 +795,12 @@ func (asicdClientMgr *FSAsicdClientMgr) IppIngressEgressDrop(srcIfIndex, dstIfIn
 	return err
 }
 
-func (asicdClientMgr *FSAsicdClientMgr) IppIngressEgressPass(srcIfIndex, dstIfIndex int32) (err error) {
+func (asicdClientMgr *FSAsicdClientMgr) IppIngressEgressPass(srcIfIndex, dstIfIndex string) (err error) {
 
 	if asicdClientMgr.ClientHdl != nil {
 		asicdmutex.Lock()
-		aclName := fmt.Sprintf("IPPInOutBlockfpPort%d", dstIfIndex+1)
-		ruleName := fmt.Sprintf("%sfpPort%d", aclName, srcIfIndex+1)
+		aclName := fmt.Sprintf("IPPInOutBlockfpPort%s", dstIfIndex)
+		ruleName := fmt.Sprintf("%sfpPort%s", aclName, srcIfIndex)
 		rule := &asicdServices.AclRule{
 			RuleName: ruleName,
 			SrcPort:  srcIfIndex,
@@ -814,8 +814,8 @@ func (asicdClientMgr *FSAsicdClientMgr) IppIngressEgressPass(srcIfIndex, dstIfIn
 		}
 		acl := &asicdServices.Acl{
 			AclName:      aclName,
+			AclType:      "MLAG",
 			RuleNameList: []string{ruleName},
-			IntfList:     []string{fmt.Sprintf("fpPort%d", dstIfIndex+1)},
 			Direction:    "OUT",
 		}
 
@@ -891,4 +891,12 @@ func (asicdClientMgr *FSAsicdClientMgr) IppVlanConversationClear(vlan uint16, if
 		}
 	}
 	return err
+}
+
+func (asicdClientMgr *FSAsicdClientMgr) IsLoopbackType(ifIndex int32) bool {
+	if pluginCommon.GetTypeFromIfIndex(ifIndex) == commonDefs.IfTypeLoopback {
+		return true
+	}
+
+	return false
 }

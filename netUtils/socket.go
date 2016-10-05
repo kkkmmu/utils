@@ -293,6 +293,10 @@ func ConvertFdToConn(socket int) (net.Conn, error) {
 	file := os.NewFile(uintptr(socket), "")
 	conn, err := net.FileConn(file)
 	if err != nil {
+		err1 := file.Close()
+		if err1 != nil {
+			return nil, errors.New(fmt.Sprintf("Failed to create net.Conn and close intermediate file, error:%s", err))
+		}
 		return nil, err
 	}
 

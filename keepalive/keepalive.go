@@ -110,11 +110,15 @@ func InitKeepAlive(name string, paramsDir string) {
 		ka.sysdClient.IsConnected = true
 		fmt.Println(ka.name, " connected to sysd")
 	}
-	fmt.Println("Initialized KA for ", ka.name, " status ", ka.status)
-	retryTimer := time.NewTicker(time.Second * KA_INTERVAL)
-	for t := range retryTimer.C {
-		_ = t
-		ka.sysdClient.ClientHdl.PeriodicKeepAlive(ka.name)
+	if ka.sysdClient.ClientHdl != nil && ka.sysdClient.IsConnected {
+		fmt.Println("Initialized KA for ", ka.name, " status ", ka.status)
+		retryTimer := time.NewTicker(time.Second * KA_INTERVAL)
+		for t := range retryTimer.C {
+			_ = t
+			ka.sysdClient.ClientHdl.PeriodicKeepAlive(ka.name)
+		}
+	} else {
+		fmt.Println("Failed to start KA for ", ka.name)
 	}
 	return
 }

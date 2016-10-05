@@ -132,23 +132,25 @@ type VlanStateGetInfo struct {
 const (
 	//Notification msgs
 	NOTIFY_L2INTF_STATE_CHANGE       = iota // 0
-	NOTIFY_L3INTF_STATE_CHANGE              // 1
-	NOTIFY_VLAN_CREATE                      // 2
-	NOTIFY_VLAN_DELETE                      // 3
-	NOTIFY_VLAN_UPDATE                      // 4
-	NOTIFY_LOGICAL_INTF_CREATE              // 5
-	NOTIFY_LOGICAL_INTF_DELETE              // 6
-	NOTIFY_LOGICAL_INTF_UPDATE              // 7
-	NOTIFY_IPV4INTF_CREATE                  // 8
-	NOTIFY_IPV4INTF_DELETE                  // 9
-	NOTIFY_IPV6INTF_CREATE                  // 10
-	NOTIFY_IPV6INTF_DELETE                  // 11
-	NOTIFY_LAG_CREATE                       // 12
-	NOTIFY_LAG_DELETE                       // 13
-	NOTIFY_LAG_UPDATE                       // 14
-	NOTIFY_IPV4NBR_MAC_MOVE                 // 15
-	NOTIFY_IPV4_ROUTE_CREATE_FAILURE        // 16
-	NOTIFY_IPV4_ROUTE_DELETE_FAILURE        // 17
+	NOTIFY_IPV4_L3INTF_STATE_CHANGE         // 1
+	NOTIFY_IPV6_L3INTF_STATE_CHANGE         // 2
+	NOTIFY_VLAN_CREATE                      // 3
+	NOTIFY_VLAN_DELETE                      // 4
+	NOTIFY_VLAN_UPDATE                      // 5
+	NOTIFY_LOGICAL_INTF_CREATE              // 6
+	NOTIFY_LOGICAL_INTF_DELETE              // 7
+	NOTIFY_LOGICAL_INTF_UPDATE              // 8
+	NOTIFY_IPV4INTF_CREATE                  // 9
+	NOTIFY_IPV4INTF_DELETE                  // 10
+	NOTIFY_IPV6INTF_CREATE                  // 11
+	NOTIFY_IPV6INTF_DELETE                  // 12
+	NOTIFY_LAG_CREATE                       // 13
+	NOTIFY_LAG_DELETE                       // 14
+	NOTIFY_LAG_UPDATE                       // 15
+	NOTIFY_IPV4NBR_MAC_MOVE                 // 16
+	NOTIFY_IPV4_ROUTE_CREATE_FAILURE        // 17
+	NOTIFY_IPV4_ROUTE_DELETE_FAILURE        // 18
+	NOTIFY_PORT_CONFIG_MODE_CHANGE          // 19
 )
 
 type AsicdNotification map[uint8]bool
@@ -159,10 +161,16 @@ type L2IntfStateNotifyMsg struct {
 	IfState uint8
 }
 
-type L3IntfStateNotifyMsg struct {
+type IPv4L3IntfStateNotifyMsg struct {
 	MsgType uint8
 	IpAddr  string
-	IpType  int
+	IfIndex int32
+	IfState uint8
+}
+
+type IPv6L3IntfStateNotifyMsg struct {
+	MsgType uint8
+	IpAddr  string
 	IfIndex int32
 	IfState uint8
 }
@@ -213,6 +221,12 @@ type IPv6IntfNotifyMsg struct {
 	IpAddr  string
 	IfIndex int32
 	IntfRef string
+}
+
+type PortConfigModeChgNotifyMsg struct {
+	IfIndex int32
+	OldMode string
+	NewMode string
 }
 
 type AsicdNotificationHdl interface {

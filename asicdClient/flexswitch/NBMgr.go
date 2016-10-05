@@ -38,7 +38,8 @@ type processMsg func(uint8, []byte, *logging.Writer) (commonDefs.AsicdNotifyMsg,
 
 var AsicdMsgMap map[uint8]processMsg = map[uint8]processMsg{
 	asicdCommonDefs.NOTIFY_L2INTF_STATE_CHANGE:       processL2IntdStateNotifyMsg,
-	asicdCommonDefs.NOTIFY_L3INTF_STATE_CHANGE:       processL3IntfStateNotifyMsg,
+	asicdCommonDefs.NOTIFY_IPV4_L3INTF_STATE_CHANGE:  processIPv4L3IntfStateNotifyMsg,
+	asicdCommonDefs.NOTIFY_IPV6_L3INTF_STATE_CHANGE:  processIPv6L3IntfStateNotifyMsg,
 	asicdCommonDefs.NOTIFY_VLAN_CREATE:               processVlanNotifyMsg,
 	asicdCommonDefs.NOTIFY_VLAN_DELETE:               processVlanNotifyMsg,
 	asicdCommonDefs.NOTIFY_VLAN_UPDATE:               processVlanNotifyMsg,
@@ -55,6 +56,7 @@ var AsicdMsgMap map[uint8]processMsg = map[uint8]processMsg{
 	asicdCommonDefs.NOTIFY_IPV4NBR_MAC_MOVE:          processIPv4NbrMacMoveNotifyMsg,
 	asicdCommonDefs.NOTIFY_IPV4_ROUTE_CREATE_FAILURE: processIPv4RouteAddDelNotifyMsg,
 	asicdCommonDefs.NOTIFY_IPV4_ROUTE_DELETE_FAILURE: processIPv4RouteAddDelNotifyMsg,
+	asicdCommonDefs.NOTIFY_PORT_CONFIG_MODE_CHANGE:   processPortConfigModeChgNotifyMsg,
 }
 
 func processL2IntdStateNotifyMsg(rxMsgType uint8, rxMsg []byte, logger *logging.Writer) (commonDefs.AsicdNotifyMsg, error) {
@@ -73,17 +75,33 @@ func processL2IntdStateNotifyMsg(rxMsgType uint8, rxMsg []byte, logger *logging.
 	return msg, nil
 }
 
-func processL3IntfStateNotifyMsg(rxMsgType uint8, rxMsg []byte, logger *logging.Writer) (commonDefs.AsicdNotifyMsg, error) {
-	var l3Msg asicdCommonDefs.L3IntfStateNotifyMsg
+func processIPv4L3IntfStateNotifyMsg(rxMsgType uint8, rxMsg []byte, logger *logging.Writer) (commonDefs.AsicdNotifyMsg, error) {
+	var l3Msg asicdCommonDefs.IPv4L3IntfStateNotifyMsg
 	var msg commonDefs.AsicdNotifyMsg
 	err := json.Unmarshal(rxMsg, &l3Msg)
 	if err != nil {
-		logger.Err(fmt.Sprintln("Unable to unmashal L3IntfStateNotifyMsg:", rxMsg))
+		logger.Err(fmt.Sprintln("Unable to unmashal IPv4L3IntfStateNotifyMsg:", rxMsg))
 		return msg, err
 	}
-	msg = commonDefs.L3IntfStateNotifyMsg{
+	msg = commonDefs.IPv4L3IntfStateNotifyMsg{
 		MsgType: rxMsgType,
-		IpType:  l3Msg.IpType,
+		IpAddr:  l3Msg.IpAddr,
+		IfIndex: l3Msg.IfIndex,
+		IfState: l3Msg.IfState,
+	}
+	return msg, nil
+}
+
+func processIPv6L3IntfStateNotifyMsg(rxMsgType uint8, rxMsg []byte, logger *logging.Writer) (commonDefs.AsicdNotifyMsg, error) {
+	var l3Msg asicdCommonDefs.IPv6L3IntfStateNotifyMsg
+	var msg commonDefs.AsicdNotifyMsg
+	err := json.Unmarshal(rxMsg, &l3Msg)
+	if err != nil {
+		logger.Err(fmt.Sprintln("Unable to unmashal IPv6L3IntfStateNotifyMsg:", rxMsg))
+		return msg, err
+	}
+	msg = commonDefs.IPv6L3IntfStateNotifyMsg{
+		MsgType: rxMsgType,
 		IpAddr:  l3Msg.IpAddr,
 		IfIndex: l3Msg.IfIndex,
 		IfState: l3Msg.IfState,
@@ -197,6 +215,22 @@ func processIPv4NbrMacMoveNotifyMsg(rxMsgType uint8, rxMsg []byte, logger *loggi
 
 func processIPv4RouteAddDelNotifyMsg(rxMsgType uint8, rxMsg []byte, logger *logging.Writer) (commonDefs.AsicdNotifyMsg, error) {
 	var msg commonDefs.AsicdNotifyMsg
+	return msg, nil
+}
+
+func processPortConfigModeChgNotifyMsg(rxMsgType uint8, rxMsg []byte, logger *logging.Writer) (commonDefs.AsicdNotifyMsg, error) {
+	var portCfgChgMsg asicdCommonDefs.PortConfigModeChgNotifyMsg
+	var msg commonDefs.AsicdNotifyMsg
+	err := json.Unmarshal(rxMsg, &portCfgChgMsg)
+	if err != nil {
+		logger.Err(fmt.Sprintln("Unable to unmashal PortConfigModeChgNotifyMsg:", rxMsg))
+		return msg, err
+	}
+	msg = commonDefs.PortConfigModeChgNotifyMsg{
+		IfIndex: portCfgChgMsg.IfIndex,
+		OldMode: portCfgChgMsg.OldMode,
+		NewMode: portCfgChgMsg.NewMode,
+	}
 	return msg, nil
 }
 

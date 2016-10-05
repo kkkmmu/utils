@@ -493,3 +493,23 @@ func (db *PolicyEngineDB) DeletePolicyCondition(cfg PolicyConditionConfig) (val 
 	}
 	return true, err
 }
+
+func (db *PolicyEngineDB) UpdatePolicyCondition(cfg PolicyConditionConfig, attr string) (err error) {
+	func_msg := "UpdatePolicyCondition for " + cfg.Name
+	db.Logger.Debug(func_msg)
+	conditionItem := db.PolicyConditionsDB.Get(patriciaDB.Prefix(cfg.Name))
+	if conditionItem == nil {
+		db.Logger.Err(fmt.Sprintln("Condition ", cfg.Name, "not found in the DB"))
+		err = errors.New("Condition not found")
+		return err
+	}
+	//	condition := conditionItem.(PolicyCondition)
+	switch attr {
+	case "ConditionType":
+	case "Protocol":
+	case "IpPrefix":
+	case "MaskLengthRange":
+	case "PrefixSet":
+	}
+	return err
+}
