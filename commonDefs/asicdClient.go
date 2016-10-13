@@ -148,9 +148,17 @@ const (
 	NOTIFY_LAG_DELETE                       // 14
 	NOTIFY_LAG_UPDATE                       // 15
 	NOTIFY_IPV4NBR_MAC_MOVE                 // 16
+	NOTIFY_IPV6NBR_MAC_MOVE                 // 17
 	NOTIFY_IPV4_ROUTE_CREATE_FAILURE        // 17
 	NOTIFY_IPV4_ROUTE_DELETE_FAILURE        // 18
-	NOTIFY_PORT_CONFIG_MODE_CHANGE          // 19
+	NOTIFY_IPV6_ROUTE_CREATE_FAILURE        // 19
+	NOTIFY_IPV6_ROUTE_DELETE_FAILURE        // 20
+	NOTIFY_VTEP_CREATE                      // 21
+	NOTIFY_VTEP_DELETE                      // 22
+	NOTIFY_MPLSINTF_STATE_CHANGE            // 23
+	NOTIFY_MPLSINTF_CREATE                  // 24
+	NOTIFY_MPLSINTF_DELETE                  // 25
+	NOTIFY_PORT_CONFIG_MODE_CHANGE          // 26
 )
 
 type AsicdNotification map[uint8]bool
@@ -176,11 +184,12 @@ type IPv6L3IntfStateNotifyMsg struct {
 }
 
 type VlanNotifyMsg struct {
-	MsgType    uint8
-	VlanId     uint16
-	VlanName   string
-	TagPorts   []int32
-	UntagPorts []int32
+	MsgType     uint8
+	VlanId      uint16
+	VlanIfIndex int32
+	VlanName    string
+	TagPorts    []int32
+	UntagPorts  []int32
 }
 
 type LogicalIntfNotifyMsg struct {
@@ -200,6 +209,7 @@ type IPv4IntfNotifyMsg struct {
 	MsgType uint8
 	IpAddr  string
 	IfIndex int32
+	IntfRef string
 }
 
 type IPv4NbrMacMoveNotifyMsg struct {
@@ -227,6 +237,11 @@ type PortConfigModeChgNotifyMsg struct {
 	IfIndex int32
 	OldMode string
 	NewMode string
+}
+
+type PortConfigMtuChangeNotifyMsg struct {
+	IfIndex int32
+	Mtu     int32
 }
 
 type AsicdNotificationHdl interface {

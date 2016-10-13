@@ -146,7 +146,9 @@ func eventHandler() {
 }
 
 func PublishEvents(txEvt *TxEvent) error {
-	PublishCh <- txEvt
+	if PublishCh != nil {
+		PublishCh <- txEvt
+	}
 	return nil
 }
 

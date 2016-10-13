@@ -13,13 +13,13 @@
 //	 See the License for the specific language governing permissions and
 //	 limitations under the License.
 //
-// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __  
-// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  | 
-// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  | 
-// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   | 
-// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  | 
-// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__| 
-//                                                                                                           
+// _______  __       __________   ___      _______.____    __    ____  __  .___________.  ______  __    __
+// |   ____||  |     |   ____\  \ /  /     /       |\   \  /  \  /   / |  | |           | /      ||  |  |  |
+// |  |__   |  |     |  |__   \  V  /     |   (----` \   \/    \/   /  |  | `---|  |----`|  ,----'|  |__|  |
+// |   __|  |  |     |   __|   >   <       \   \      \            /   |  |     |  |     |  |     |   __   |
+// |  |     |  `----.|  |____ /  .  \  .----)   |      \    /\    /    |  |     |  |     |  `----.|  |  |  |
+// |__|     |_______||_______/__/ \__\ |_______/        \__/  \__/     |__|     |__|      \______||__|  |__|
+//
 
 package patriciaDB
 
@@ -35,7 +35,7 @@ type childList interface {
 	replace(b byte, child *Trie)
 	remove(child *Trie)
 	next(b byte) *Trie
-    nextWithLongestPrefixMatch(b byte) (trie *Trie, exact bool)
+	nextWithLongestPrefixMatch(b byte) (trie *Trie, exact bool)
 	walk(prefix *Prefix, visitor VisitorFunc) error
 	walkAndUpdate(prefix *Prefix, visitor UpdateFunc, handle Item) error
 	print(w io.Writer, indent int)
@@ -78,8 +78,8 @@ func (list *sparseChildList) head() *Trie {
 func (list *sparseChildList) add(child *Trie) childList {
 	// Search for an empty spot and insert the child if possible.
 	//if len(list.children) != cap(list.children) {
-		list.children = append(list.children, child)
-		return list
+	list.children = append(list.children, child)
+	return list
 	//}
 
 	// Otherwise we have to transform to the dense list type.
@@ -115,18 +115,18 @@ func (list *sparseChildList) nextWithLongestPrefixMatch(b byte) (trie *Trie, exa
 	var longestPrefixChild *Trie = nil
 	for _, child := range list.children {
 		//logger.Println("Scanning child ", child.prefix, " child.prefix[0] = ", child.prefix[0])
-		if child.prefix[0] == b {
+		if child != nil && len(child.prefix) > 0 && child.prefix[0] == b {
 			//logger.Println("returning child ", child.prefix, "exact byte match")
-			return child,true
+			return child, true
 		}
-		if uint(child.prefix[0]) < uint(b) {
+		if child != nil && len(child.prefix) > 0 && uint(child.prefix[0]) < uint(b) {
 			//logger.Println("potential child ", child.prefix, " a potential match")
-             if longestPrefixChild == nil || (uint(longestPrefixChild.prefix[0]) < uint(child.prefix[0])) {
-			   longestPrefixChild = child
+			if longestPrefixChild == nil || (uint(longestPrefixChild.prefix[0]) < uint(child.prefix[0])) {
+				longestPrefixChild = child
 			}
 		}
 	}
-	return longestPrefixChild,exact
+	return longestPrefixChild, exact
 }
 
 func (list *sparseChildList) next(b byte) *Trie {
@@ -141,8 +141,8 @@ func (list *sparseChildList) next(b byte) *Trie {
 func (list *sparseChildList) walkAndUpdate(prefix *Prefix, visitor UpdateFunc, handle Item) error {
 
 	sort.Sort(list.children)
-	for i:=0;i<len(list.children);i++ {
-	//for _, child := range list.children {
+	for i := 0; i < len(list.children); i++ {
+		//for _, child := range list.children {
 		child := list.children[i]
 		*prefix = append(*prefix, child.prefix...)
 		curr_len := len(list.children)
@@ -163,7 +163,7 @@ func (list *sparseChildList) walkAndUpdate(prefix *Prefix, visitor UpdateFunc, h
 		if err != nil {
 			return err
 		}
-		if len(list.children) < curr_len {	//the current node was deleted
+		if len(list.children) < curr_len { //the current node was deleted
 			i = i - 1
 		}
 	}
@@ -198,6 +198,7 @@ func (list *sparseChildList) walk(prefix *Prefix, visitor VisitorFunc) error {
 
 	return nil
 }
+
 /*
 func (list *sparseChildList) total() int {
 	tot := 0
@@ -313,7 +314,7 @@ func (list *denseChildList) next(b byte) *Trie {
 	return list.children[i-list.min]
 }
 func (list *denseChildList) nextWithLongestPrefixMatch(b byte) (trie *Trie, exact bool) {
-	return nil,exact
+	return nil, exact
 }
 func (list *denseChildList) walkAndUpdate(prefix *Prefix, visitor UpdateFunc, handle Item) error {
 	for _, child := range list.children {
@@ -376,6 +377,7 @@ func (list *denseChildList) print(w io.Writer, indent int) {
 		}
 	}
 }
+
 /*
 func (list *denseChildList) total() int {
 	tot := 0
