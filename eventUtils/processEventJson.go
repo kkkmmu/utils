@@ -51,6 +51,7 @@ type DaemonEvent struct {
 	DaemonId          int
 	DaemonName        string
 	DaemonEventEnable bool
+	EventBufferSize   int
 	EventList         []EventStruct
 }
 

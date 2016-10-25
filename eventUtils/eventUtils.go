@@ -34,6 +34,7 @@ import (
 	"time"
 	"utils/dbutils"
 	"utils/logging"
+	"utils/ringBuffer"
 	"utils/typeConv"
 )
 
@@ -84,6 +85,8 @@ type TxEvent struct {
 	AdditionalData interface{}
 }
 
+var EventRingBuffer *ringBuffer.RingBuffer
+
 var GlobalEventEnable bool = true
 var Logger logging.LoggerIntf
 var PubHdl PubIntf
@@ -101,6 +104,7 @@ func initEventDetails(ownerName string) error {
 		Logger.Debug(fmt.Sprintln("OwnerName:", ownerName, "daemon.DaemonName:", daemon.DaemonName))
 		if daemon.DaemonName == ownerName {
 			GlobalEventEnable = daemon.DaemonEventEnable
+			EventRingBuffer.SetRingBufferCapacity(daemon.EventBufferSize)
 			for _, evt := range daemon.EventList {
 				evtId := events.EventId(evt.EventId)
 				evtEnt, _ := EventMap[evtId]
@@ -124,6 +128,7 @@ func InitEvents(ownerName string, dbHdl dbutils.DBIntf, pubHdl PubIntf, logger l
 	Logger = logger
 	PubHdl = pubHdl
 	DbHdl = dbHdl
+	EventRingBuffer = new(ringBuffer.RingBuffer)
 	Logger.Debug(fmt.Sprintln("Initializing Owner Name :", ownerName))
 	err := initEventDetails(ownerName)
 	if err != nil {
@@ -195,6 +200,11 @@ func publishTxEvents(txEvt *TxEvent) error {
 	if err != nil {
 		Logger.Err(fmt.Sprintln("Storing Events in database failed, err:", err))
 	}
+	// Store Event Meta data in Ring Buffer
+	err = StoreEventMetaDataInRB(evt.TimeStamp.UnixNano(), evt.OwnerName)
+	if err != nil {
+		Logger.Err("Storing Event in Ring Buffer failed", err)
+	}
 	//Store event stats in DB
 	var statObj events.EventStats
 	statObj.EventId = txEvt.EventId
@@ -210,13 +220,39 @@ func publishTxEvents(txEvt *TxEvent) error {
 		statObj.NumEvents += 1
 		statObj.LastEventTime = evt.TimeStamp.String()
 	}
+
 	err = DbHdl.StoreEventObjectInDb(statObj)
 	if err != nil {
 		Logger.Err(fmt.Sprintln("Storing Event Stats in database failed, err:", err))
 	}
+
 	//Publish event
 	PubHdl.Publish("PUBLISH", evt.OwnerName, msg)
 	return nil
+}
+
+func StoreEventMetaDataInRB(timeStamp int64, ownerName string) error {
+	_, oldVal := EventRingBuffer.InsertIntoRingBuffer(timeStamp)
+	if oldVal == nil {
+		return nil
+	}
+	oldTimeStamp, retVal := oldVal.(int64)
+	if !retVal {
+		return nil
+	}
+
+	keyStr := fmt.Sprintf("Events#*#*#%s#*#*#*#*#%d#", ownerName, oldTimeStamp)
+	keyList, err := typeConv.ConvertToStrings(DbHdl.GetAllKeys(keyStr))
+	if err != nil {
+		Logger.Err("Error querying for keys:", err)
+	}
+	for _, key := range keyList {
+		err := DbHdl.DeleteValFromDb(key)
+		if err != nil {
+			Logger.Err("Error deleting entry with keys:", key, err)
+		}
+	}
+	return err
 }
 
 func GetEvents(evtObj events.EventObj, dbHdl dbutils.DBIntf, logger logging.LoggerIntf) (evt []events.EventObj, err error) {

@@ -75,6 +75,7 @@ type DBIntf interface {
 	GetBulkObjFromDb(obj objects.ConfigObj, startIndex, count int64) (error, int64, int64, bool, []objects.ConfigObj)
 	Publish(string, interface{}, interface{})
 	StoreValInDb(interface{}, interface{}, interface{}) error
+	DeleteValFromDb(interface{}) error
 	GetAllKeys(interface{}) (interface{}, error)
 	GetValFromDB(key interface{}, field interface{}) (val interface{}, err error)
 	StoreEventObjectInDb(events.EventObj) error
@@ -289,6 +290,17 @@ func (db *DBUtil) StoreValInDb(key interface{}, val interface{}, field interface
 	}
 	err := errors.New("DB Connection handler is nil")
 	return err
+}
+
+func (db *DBUtil) DeleteValFromDb(key interface{}) error {
+	defer db.DbLock.Unlock()
+	db.DbLock.Lock()
+	_, err := db.Do("DEL", key)
+	if err != nil {
+		db.logger.Err(fmt.Sprintln("Failed to delete entry with key ", key, "entry in db ", err))
+		return err
+	}
+	return nil
 }
 
 func (db *DBUtil) GetAllKeys(pattern interface{}) (val interface{}, err error) {
