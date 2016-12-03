@@ -159,6 +159,7 @@ const (
 	NOTIFY_MPLSINTF_CREATE                  // 24
 	NOTIFY_MPLSINTF_DELETE                  // 25
 	NOTIFY_PORT_CONFIG_MODE_CHANGE          // 26
+	NOTIFY_PORT_CONFIG_MTU_CHANGE           // 27
 )
 
 type AsicdNotification map[uint8]bool
@@ -239,7 +240,7 @@ type PortConfigModeChgNotifyMsg struct {
 	NewMode string
 }
 
-type PortConfigMtuChangeNotifyMsg struct {
+type PortConfigMtuChgNotifyMsg struct {
 	IfIndex int32
 	Mtu     int32
 }
